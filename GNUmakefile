@@ -62,7 +62,7 @@ QEMU := $(shell if which qemu >/dev/null 2>&1; \
 	echo "*** or have you tried setting the QEMU variable in conf/env.mk?" 1>&2; \
 	echo "***" 1>&2; exit 1)
 endif
-
+# $(info QEMU is located at: $(QEMU))
 # try to generate a unique GDB port
 GDBPORT	:= $(shell expr `id -u` % 5000 + 25000)
 
