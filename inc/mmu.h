@@ -73,7 +73,7 @@
 #define PTE_SYSCALL	(PTE_AVAIL | PTE_P | PTE_W | PTE_U)
 
 // Address in page table or page directory entry
-#define PTE_ADDR(pte)	((physaddr_t) (pte) & ~0xFFF)
+#define PTE_ADDR(pte)	((physaddr_t) (pte) & ~0xFFF) // why & ～0xFFF 物理页面是4KB对齐，也就是12bit，PTE是一个完整的页面，所以物理地址后面12bit清零就是PTE的物理起始地址
 
 // Control Register flags
 #define CR0_PE		0x00000001	// Protection Enable

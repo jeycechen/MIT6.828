@@ -71,6 +71,7 @@ relocated:
 	# Clear the frame pointer register (EBP)
 	# so that once we get into debugging C code,
 	# stack backtraces will be terminated properly.
+	# 这里设置成0 后面backtrace到这的时候就会 terminater properly！！
 	movl	$0x0,%ebp			# nuke frame pointer
 
 	# Set the stack pointer
