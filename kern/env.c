@@ -116,7 +116,16 @@ env_init(void)
 {
 	// Set up envs array
 	// LAB 3: Your code here.
-
+	// 初始化所有的Env structures，并且添加到env_free_list
+	int i = 1;
+	struct Env* last = envs; // 构建 env_free_list
+	while(i < NENV){
+		last->env_link = &envs[i];
+		last = &envs[i];
+		i++;
+	}
+	env_free_list = envs; // 开始的时候都是空， 所以头部就是envs
+	
 	// Per-CPU part of the initialization
 	env_init_percpu();
 }
@@ -179,7 +188,14 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 3: Your code here.
-
+	// 如何复制？？如何把kern_pgidr 复制到 p？ jos只有一个核心，所以所有env的内核地址空间其实都是映射到一个地方
+	// boot_map_region(e->env_pgdir, UPAGES, PTSIZE, PADDR(pages), PTE_U);
+	// boot_map_region(e->env_pgdir, UENVS, PTSIZE, PADDR(envs), PTE_U);
+	// boot_map_region(e->env_pgdir, KSTACKTOP - KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W);
+	// boot_map_region(e->env_pgdir, KERNBASE, (0xffffffff - KERNBASE), 0, PTE_W);
+	e->env_pgdir = (pde_t *) page2kva(p);
+	memcpy(e->env_pgdir, kern_pgdir, PGSIZE);
+	(p->pp_ref)++;
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
 	e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_P | PTE_U;
@@ -267,6 +283,18 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   'va' and 'len' values that are not page-aligned.
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
+	// 分配物理页面，且len va 都是没有对齐的
+	void* start_va = (void *) ROUNDDOWN(va, PGSIZE); // va 对PGSIZE 向下取整
+	void* end_va = (void *)ROUNDUP(va + len, PGSIZE); // va + len 向上ROUNDUP
+	if((uint32_t)start_va > UTOP) return; // 非法输入 使用了不符合内存布局的地址空间
+	if((uint32_t)end_va > UTOP) end_va = (void*)UTOP; // 限制
+	struct PageInfo* new_pp;
+	for(; start_va < end_va; start_va += PGSIZE){ // 循环分配物理页
+		if(!(new_pp = page_alloc(ALLOC_ZERO)))
+			panic("region_alloc: alloc failed.");
+		if(page_insert(e->env_pgdir, new_pp, va, PTE_U | PTE_W)) // 权限应该是 用户自己的
+			panic("region_allo: page insert failed.");
+	}
 }
 
 //
@@ -321,14 +349,32 @@ load_icode(struct Env *e, uint8_t *binary)
 	//  You must also do something with the program's entry point,
 	//  to make sure that the environment starts executing there.
 	//  What?  (See env_run() and env_pop_tf() below.)
-
+	// 需要做什么 ？？
 	// LAB 3: Your code here.
-
+	struct Elf* elf_header= (struct Elf *) binary;
+	
+	if(elf_header->e_magic != ELF_MAGIC) 
+		panic("load_icode: illegal ELF format.");
+	lcr3(PADDR(e->env_pgdir));
+	struct Proghdr *ph, *eph;
+	ph = (struct Proghdr *) ((uint8_t *) elf_header + elf_header->e_phoff);
+	eph = ph + elf_header->e_phnum;
+	for(; ph < eph; ph++){
+		if(ph->p_type == ELF_PROG_LOAD){ // 只加载type为这个的 段
+			region_alloc(e, (void *)ph->p_va, ph->p_memsz);
+			memset((void *)ph->p_va, 0, ph->p_memsz);
+			memcpy((void *)ph->p_va, binary + ph->p_offset, ph->p_filesz);
+		}
+	}
+	// do something with entry
+	e->env_tf.tf_eip = elf_header->e_entry;
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
-
 	// LAB 3: Your code here.
+	lcr3(PADDR(kern_pgdir));
+	region_alloc(e, (void *)(USTACKTOP - PGSIZE), PGSIZE); // 给栈分配一个page的空间
 }
+
 
 //
 // Allocates a new env with env_alloc, loads the named elf
@@ -341,6 +387,11 @@ void
 env_create(uint8_t *binary, enum EnvType type)
 {
 	// LAB 3: Your code here.
+	struct Env* new_env;
+	if(env_alloc(&new_env, 0))
+		panic("env_create: env_alloc failed.");
+	load_icode(new_env, binary);
+	new_env->env_type = type;
 }
 
 //
@@ -457,7 +508,17 @@ env_run(struct Env *e)
 	//	e->env_tf to sensible values.
 
 	// LAB 3: Your code here.
+	// panic("env_run not yet implemented");
+	
+	// step1
+	if(curenv->env_status == ENV_RUNNING) curenv->env_status = ENV_RUNNABLE;
+	curenv = e;
+	e->env_status = ENV_RUNNING;
+	e->env_runs++;	
+	lcr3(PADDR(e->env_pgdir));
 
-	panic("env_run not yet implemented");
+	// step2
+	env_pop_tf(&(e->env_tf));
+
 }
 
