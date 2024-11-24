@@ -117,15 +117,16 @@ env_init(void)
 	// Set up envs array
 	// LAB 3: Your code here.
 	// 初始化所有的Env structures，并且添加到env_free_list
-	int i = 1;
-	struct Env* last = envs; // 构建 env_free_list
-	while(i < NENV){
-		last->env_link = &envs[i];
-		last = &envs[i];
-		i++;
+	int i = NENV - 1;
+	env_free_list = NULL;
+	while(i >= 0){
+		envs[i].env_id = 0;
+		envs[i].env_status = ENV_FREE;
+		envs[i].env_link = env_free_list;
+		env_free_list = &envs[i];
+		--i;
 	}
-	env_free_list = envs; // 开始的时候都是空， 所以头部就是envs
-	
+
 	// Per-CPU part of the initialization
 	env_init_percpu();
 }
@@ -193,9 +194,9 @@ env_setup_vm(struct Env *e)
 	// boot_map_region(e->env_pgdir, UENVS, PTSIZE, PADDR(envs), PTE_U);
 	// boot_map_region(e->env_pgdir, KSTACKTOP - KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W);
 	// boot_map_region(e->env_pgdir, KERNBASE, (0xffffffff - KERNBASE), 0, PTE_W);
+	++(p->pp_ref);
 	e->env_pgdir = (pde_t *) page2kva(p);
 	memcpy(e->env_pgdir, kern_pgdir, PGSIZE);
-	(p->pp_ref)++;
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
 	e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_P | PTE_U;
@@ -286,14 +287,16 @@ region_alloc(struct Env *e, void *va, size_t len)
 	// 分配物理页面，且len va 都是没有对齐的
 	void* start_va = (void *) ROUNDDOWN(va, PGSIZE); // va 对PGSIZE 向下取整
 	void* end_va = (void *)ROUNDUP(va + len, PGSIZE); // va + len 向上ROUNDUP
-	if((uint32_t)start_va > UTOP) return; // 非法输入 使用了不符合内存布局的地址空间
-	if((uint32_t)end_va > UTOP) end_va = (void*)UTOP; // 限制
+	// if((uint32_t)start_va > UTOP) return; // 非法输入 使用了不符合内存布局的地址空间
+	// if((uint32_t)end_va > UTOP) end_va = (void*)UTOP; // 限制
 	struct PageInfo* new_pp;
 	for(; start_va < end_va; start_va += PGSIZE){ // 循环分配物理页
 		if(!(new_pp = page_alloc(ALLOC_ZERO)))
 			panic("region_alloc: alloc failed.");
+
 		if(page_insert(e->env_pgdir, new_pp, va, PTE_U | PTE_W)) // 权限应该是 用户自己的
 			panic("region_allo: page insert failed.");
+		cprintf("va %p ppaddr%x %d\n", start_va, page2kva(new_pp), *((int *)start_va));
 	}
 }
 
@@ -362,8 +365,12 @@ load_icode(struct Env *e, uint8_t *binary)
 	for(; ph < eph; ph++){
 		if(ph->p_type == ELF_PROG_LOAD){ // 只加载type为这个的 段
 			region_alloc(e, (void *)ph->p_va, ph->p_memsz);
-			memset((void *)ph->p_va, 0, ph->p_memsz);
-			memcpy((void *)ph->p_va, binary + ph->p_offset, ph->p_filesz);
+			cprintf("p_va%p memsz %d filesz%d\n",(void *)ph->p_va, ph->p_memsz,ph->p_filesz);
+			cprintf("val %d\n",*((int *)(0x201000)));
+			cprintf("hello ?????\n");
+			memmove((void *)ph->p_va, binary + ph->p_offset, ph->p_filesz);
+			// memset((void *)ph->p_va, 0, ph->p_filesz);
+			// memcpy((void *)ph->p_va, binary + ph->p_offset, ph->p_filesz);
 		}
 	}
 	// do something with entry
@@ -390,6 +397,7 @@ env_create(uint8_t *binary, enum EnvType type)
 	struct Env* new_env;
 	if(env_alloc(&new_env, 0))
 		panic("env_create: env_alloc failed.");
+	cprintf("new_env id %d\n",new_env->env_id);
 	load_icode(new_env, binary);
 	new_env->env_type = type;
 }

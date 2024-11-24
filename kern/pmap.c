@@ -174,7 +174,7 @@ mem_init(void)
 	// particular, we can now map memory **** using boot_map_region
 	// or page_insert
 	
-	page_init(); //初始化所有的虚拟地址页面
+	page_init(); //初始化所有的物理地址页面
 
 	check_page_free_list(1);
 	check_page_alloc();
@@ -333,9 +333,10 @@ struct PageInfo *
 page_alloc(int alloc_flags)
 {
 	// Fill this function in
-	if(!page_free_list) return NULL; //没有可用的空页面， return NULL
+	if(page_free_list == NULL) return NULL; //没有可用的空页面， return NULL
 	struct PageInfo* ret = page_free_list;
-	page_free_list = page_free_list->pp_link; // 让page_free_list 指向下一个空页面
+	// cprintf("page alloc:%p\n",ret);
+	page_free_list = ret->pp_link; // 让page_free_list 指向下一个空页面
 	ret->pp_link = NULL;
 	if(alloc_flags & ALLOC_ZERO){
 		memset(page2kva(ret), 0, PGSIZE);
@@ -400,7 +401,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 	// Fill this function in
 	// 返回的是一个虚拟地址
 	assert(pgdir);
-	pde_t *pgdir_entry = &pgdir[PDX(va)]; // 获取二级页表page table pages的地址
+	pde_t *pgdir_entry = pgdir + PDX(va); // 获取二级页表page table pages的地址
 	// 可能不存在
 	if(!(*pgdir_entry & PTE_P)){
 		if(!create) return NULL;
@@ -476,11 +477,13 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 	// Fill this function in
 	pte_t *pte = pgdir_walk(pgdir, va, 1); // 
 	if(pte == NULL) return -E_NO_MEM;
-	++pp->pp_ref;
+	++(pp->pp_ref);
+	
 	if((*pte) & PTE_P){
+		cprintf("pte:%p page_insert: remove...\n", pte);
 		page_remove(pgdir, va);
 	}
-	*pte = page2pa(pp) | perm | PTE_P;
+	*pte = (page2pa(pp) | perm | PTE_P);
 	*(pgdir + PDX(va)) |= perm; // 这一步作用是设置PDE的permission 为什么要设置？？没有也能过check_page()
 	return 0;
 }
