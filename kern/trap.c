@@ -269,15 +269,6 @@ page_fault_handler(struct Trapframe *tf)
 	if((tf->tf_cs & 3) == 0)
 		panic("Page fault in kernel-mode\n");
 
-	// struct PageInfo *pp = page_alloc(ALLOC_ZERO);
-	// if (pp == NULL) {
-	// 	env_destroy(curenv);
-	// 	return;
-	// }
-	// if (page_insert(curenv->env_pgdir, pp, (void *)fault_va, PTE_U | PTE_W) < 0) {
-	// 	page_free(pp);
-	// 	env_destroy(curenv);
-	// }
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
 
