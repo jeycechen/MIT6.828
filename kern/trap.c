@@ -71,8 +71,49 @@ trap_init(void)
 {
 	extern struct Segdesc gdt[];
 
-	// LAB 3: Your code here.
-
+    // LAB 3: Your code here.
+	
+    void handler_divide();
+	SETGATE(idt[T_DIVIDE], 0, GD_KT, handler_divide, 0);
+	void handler_debug();
+	SETGATE(idt[T_DEBUG], 0, GD_KT, handler_debug, 0);
+	void handler_nmi();
+	SETGATE(idt[T_NMI], 0, GD_KT, handler_nmi, 0);
+	void handler_brkpt();
+	SETGATE(idt[T_BRKPT], 0, GD_KT, handler_brkpt, 3);
+	void handler_oflow();
+	SETGATE(idt[T_OFLOW], 0, GD_KT, handler_oflow, 0);
+	void handler_bound();
+	SETGATE(idt[T_BOUND], 0, GD_KT, handler_bound, 0);
+	void handler_illop();
+	SETGATE(idt[T_ILLOP], 0, GD_KT, handler_illop, 0);
+	void handler_device();
+	SETGATE(idt[T_DEVICE], 0, GD_KT, handler_device, 0);
+	void handler_dblflt();
+	SETGATE(idt[T_DBLFLT], 0, GD_KT, handler_dblflt, 0);
+	void handler_tss();
+	SETGATE(idt[T_TSS], 0, GD_KT, handler_tss, 0);
+	void handler_segnp();
+	SETGATE(idt[T_SEGNP], 0, GD_KT, handler_segnp, 0);
+	void handler_stack();
+	SETGATE(idt[T_STACK], 0, GD_KT, handler_stack, 0);
+	void handler_gpflt();
+	SETGATE(idt[T_GPFLT], 0, GD_KT, handler_gpflt, 0);
+	void handler_pgflt();
+	SETGATE(idt[T_PGFLT], 0, GD_KT, handler_pgflt, 0);
+	void handler_fperr();
+	SETGATE(idt[T_FPERR], 0, GD_KT, handler_fperr, 0);
+	void handler_align();
+	SETGATE(idt[T_ALIGN], 0, GD_KT, handler_align, 0);
+	void handler_mchk();
+	SETGATE(idt[T_MCHK], 0, GD_KT, handler_mchk, 0);
+	void handler_simderr();
+	SETGATE(idt[T_SIMDERR], 0, GD_KT, handler_simderr, 0);
+	void handler_syscall();
+	SETGATE(idt[T_SYSCALL], 1, GD_KT, handler_syscall, 3);
+	void handler_default();
+	SETGATE(idt[T_DEFAULT], 0, GD_KT, handler_default, 0);
+	
 	// Per-CPU setup 
 	trap_init_percpu();
 }
@@ -176,7 +217,20 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
-
+	cprintf("trap_dispatch.. \n");
+	if(tf->tf_trapno == T_PGFLT){
+		cprintf("page_fault handler\n");
+		page_fault_handler(tf);
+		return;
+	}
+	if(tf->tf_trapno == T_BRKPT){
+		monitor(tf);
+		return;
+	}
+	if(tf->tf_trapno == T_SYSCALL){
+		tf->tf_regs.reg_eax = syscall(tf->tf_regs.reg_eax, tf->tf_regs.reg_edx, tf->tf_regs.reg_ecx, tf->tf_regs.reg_ebx, tf->tf_regs.reg_edi, tf->tf_regs.reg_esi);
+		return;
+	}
 	// Handle spurious interrupts
 	// The hardware sometimes raises these because of noise on the
 	// IRQ line or other reasons. We don't care.
@@ -219,6 +273,7 @@ trap(struct Trapframe *tf)
 	// Check that interrupts are disabled.  If this assertion
 	// fails, DO NOT be tempted to fix it by inserting a "cli" in
 	// the interrupt path.
+	// 检查中断被屏蔽，如果assert失败，不要试图使用"cli" fix it
 	assert(!(read_eflags() & FL_IF));
 
 	if ((tf->tf_cs & 3) == 3) {
@@ -234,13 +289,16 @@ trap(struct Trapframe *tf)
 			curenv = NULL;
 			sched_yield();
 		}
-
+		// 在这之前的tf是在栈上的，不稳定
 		// Copy trap frame (which is currently on the stack)
 		// into 'curenv->env_tf', so that running the environment
 		// will restart at the trap point.
-		curenv->env_tf = *tf;
+		curenv->env_tf = *tf; // 保存curenv使用的trapfram方便恢复秩序
 		// The trapframe on the stack should be ignored from here on.
-		tf = &curenv->env_tf;
+		tf = &curenv->env_tf; // 这里是在干嘛？ 是否有些多余
+		// 在这里，tf复制到了curenv里面，这是放在内核的全局变量的，比较稳定
+		//1、确保后续操作使用正确的陷阱帧：通过复制陷阱帧并更新指针，后续的代码可以一致地使用保存在环境变量中的陷阱帧副本，而不必担心栈上的原始陷阱帧可能会被覆盖或修改。
+		//2、方便恢复环境：保存了陷阱帧的副本后，可以在需要时方便地恢复环境，因为可以直接从环境变量中获取陷阱帧信息，而不需要再次从栈上获取可能已经不可靠的陷阱帧
 	}
 
 	// Record that tf is the last real trapframe so
@@ -248,7 +306,7 @@ trap(struct Trapframe *tf)
 	last_tf = tf;
 
 	// Dispatch based on what type of trap occurred
-	trap_dispatch(tf);
+	trap_dispatch(tf); // 中断处理完成，继续执行curenv
 
 	// If we made it to this point, then no other environment was
 	// scheduled, so we should return to the current environment
@@ -269,8 +327,12 @@ page_fault_handler(struct Trapframe *tf)
 	fault_va = rcr2();
 
 	// Handle kernel-mode page faults.
-
+	
 	// LAB 3: Your code here.
+	// return;
+
+	if((tf->tf_cs & 3) == 0)
+		panic("Page fault in kernel-mode\n");
 
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
@@ -307,6 +369,8 @@ page_fault_handler(struct Trapframe *tf)
 	// LAB 4: Your code here.
 
 	// Destroy the environment that caused the fault.
+	// 为什么需要destroy 这个env？？ 直接销毁导致页面错误的env
+	
 	cprintf("[%08x] user fault va %08x ip %08x\n",
 		curenv->env_id, fault_va, tf->tf_eip);
 	print_trapframe(tf);

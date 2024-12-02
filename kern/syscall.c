@@ -21,9 +21,9 @@ sys_cputs(const char *s, size_t len)
 	// Check that the user has permission to read memory [s, s+len).
 	// Destroy the environment if not.
 
-	// LAB 3: Your code here.
-
-	// Print the string supplied by the user.
+	// LAB 3: Your code here.  这几个syscall只有这个是需要传入s，所以需要user_mem_assert s
+	user_mem_assert(curenv, s, len, 0);
+	// Print the string supplied by the user. 
 	cprintf("%.*s", len, s);
 }
 
@@ -271,11 +271,29 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	// Return any appropriate return value.
 	// LAB 3: Your code here.
 
-	panic("syscall not implemented");
-
+	// panic("syscall not implemented");
+	int32_t ret = 0;
 	switch (syscallno) {
-	default:
-		return -E_INVAL;
+		case SYS_cputs:
+			sys_cputs((char *)a1, (size_t) a2);
+			ret = 0;
+			break;
+		case SYS_cgetc:
+			ret = sys_cgetc();
+			break;
+		case SYS_getenvid:
+			ret = sys_getenvid();
+			break;
+		case SYS_env_destroy:
+			ret = sys_env_destroy(a1);
+			break;
+		case NSYSCALLS:
+			// 无操作
+			ret = 0;
+			break;
+		default:
+			ret = -E_INVAL;
 	}
+	return ret;
 }
 
