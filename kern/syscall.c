@@ -20,9 +20,9 @@ sys_cputs(const char *s, size_t len)
 	// Check that the user has permission to read memory [s, s+len).
 	// Destroy the environment if not.
 
-	// LAB 3: Your code here.
+	// LAB 3: Your code here.  这几个syscall只有这个是需要传入s，所以需要user_mem_assert s
 	user_mem_assert(curenv, s, len, 0);
-	// Print the string supplied by the user.
+	// Print the string supplied by the user. 
 	cprintf("%.*s", len, s);
 }
 

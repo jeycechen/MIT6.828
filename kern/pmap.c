@@ -593,7 +593,7 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 	for (i = (uint32_t)begin; i < end; i += PGSIZE) {
 		pte_t *pte = pgdir_walk(env->env_pgdir, (void*)i, 0);
 		if ((i >= ULIM) || !pte || !(*pte & PTE_P) || ((*pte & perm) != perm)) {        //具体检测规则
-			user_mem_check_addr = (i < (uint32_t)va ? (uint32_t)va : i);                //记录无效的那个线性地址
+			user_mem_check_addr = (i < (uint32_t)va ? (uint32_t)va : i);                //记录无效的那个线性地址，因为有向下取整
 			return -E_FAULT;
 		}
 	}
