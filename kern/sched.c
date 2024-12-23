@@ -20,15 +20,26 @@ sched_yield(void)
 	// last running.  Switch to the first such environment found.
 	//
 	// If no envs are runnable, but the environment previously
-	// running on this CPU is still ENV_RUNNING, it's okay to
+	// running on this CPU is still ENVs_RUNNING, it's okay to
 	// choose that environment.
 	//
 	// Never choose an environment that's currently running on
 	// another CPU (env_status == ENV_RUNNING). If there are
 	// no runnable environments, simply drop through to the code
 	// below to halt the cpu.
-
+	
 	// LAB 4: Your code here.
+	
+	int cur_env_id = curenv == NULL ? -1 : curenv->env_id; //如果没有curenv 那么从0 开始找（开头）
+	idle = NULL;
+	int i ;
+	for (i = cur_env_id + 1;i < NENV; ++i) {
+		idle = envs + i;
+		if(idle->env_status == ENV_RUNNABLE) break;
+	}
+	if(i == NENV && idle == NULL && curenv->env_status == ENV_RUNNING) idle = curenv;
+
+	env_run(idle); // 运行找到的idle env
 
 	// sched_halt never returns
 	sched_halt();

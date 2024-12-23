@@ -277,7 +277,12 @@ mem_init_mp(void)
 	//     Permissions: kernel RW, user NONE
 	//
 	// LAB 4: Your code here:
-
+	uint32_t i=0;
+    uintptr_t start = KSTACKTOP-KSTKSIZE; 
+    for(; i < NCPU; i++){  //  NCPU 被定义为 8， 也就是这个操作系统最多支持8-core
+        boot_map_region(kern_pgdir, start, KSTKSIZE, PADDR(percpu_kstacks[i]), PTE_W | PTE_P);
+        start -= (KSTKSIZE+KSTKGAP);
+    }
 }
 
 // --------------------------------------------------------------
@@ -298,7 +303,8 @@ page_init(void)
 	// LAB 4:
 	// Change your code to mark the physical page at MPENTRY_PADDR
 	// as in use
-
+	// MPENTRY_PADDR = 0x7000 
+	// 需要标记这一页为使用，防止这部分多处理器初始化的代码被后续覆盖
 	// The example code here marks all physical pages as free.
 	// However this is not truly the case.  What memory is free?
 	//  1) Mark physical page 0 as in use.
@@ -322,6 +328,7 @@ page_init(void)
 	// 	pages[i].pp_link = page_free_list;
 	// 	page_free_list = &pages[i];
 	// }
+	
 	/*
 		根据实际的使用情况 把一些bios 和 硬件占用的虚拟地址空间所对应的页面 设置引用计数pp_ref 为1
 		没被使用的页面 串联起来 形成一个空闲页面 的链表page_free_list
@@ -337,9 +344,13 @@ page_init(void)
     //第0页用于存放real-mode IDT (interrupt descriptor table)and BIOS structures
     pages[0].pp_ref = 1;
     for (i = 1; i < npages_basemem; i++) {
-        pages[i].pp_ref = 0;
-        pages[i].pp_link = page_free_list; 
-        page_free_list = &pages[i]; // 形成一个链表
+		if(i != (int)MPENTRY_PADDR / PGSIZE) { // 这样写是为了让分支预测尽可能对
+			pages[i].pp_ref = 0;
+        	pages[i].pp_link = page_free_list; 
+        	page_free_list = &pages[i]; // 形成一个链表
+			continue;
+		}
+        pages[i].pp_ref = 1; // 这里标记 MPENTRY_PADDR已经被使用，
     }
     // I/O
     for (i = npages_basemem; i < pages_in_use_end; ++i){
@@ -515,7 +526,7 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 	++(pp->pp_ref);
 	
 	if((*pte) & PTE_P){
-		cprintf("pte:%p page_insert: remove...\n", pte);
+		// cprintf("pte:%p page_insert: remove...\n", pte);
 		page_remove(pgdir, va);
 	}
 	*pte = (page2pa(pp) | perm | PTE_P);
@@ -603,7 +614,7 @@ tlb_invalidate(pde_t *pgdir, void *va)
 //
 void *
 mmio_map_region(physaddr_t pa, size_t size)
-{
+{	
 	// Where to start the next region.  Initially, this is the
 	// beginning of the MMIO region.  Because this is static, its
 	// value will be preserved between calls to mmio_map_region
@@ -628,7 +639,14 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	panic("mmio_map_region not implemented");
+	uintptr_t ret = base;
+	size_t aligned_size = ROUNDUP(size, PGSIZE);
+	base += aligned_size; // 移动可用的虚拟地址base
+	if(base > MMIOLIM) panic("func mmio_map_region: arg size is too big, illegal...");
+	boot_map_region(kern_pgdir, ret, aligned_size, pa, PTE_PCD | PTE_PWT | PTE_W); // 这个地址是一个device，所以cache是unsafe的，必须使用
+	// PTE_PCD | PTE_PWT 来告诉cpu这是不可信赖的，cache-disable & write-through
+	// 函数功能是要返回一个可以被mmio的一个虚拟地址，这个虚拟地址被映射到一个物理地址pa
+	return (void *)ret;
 }
 
 static uintptr_t user_mem_check_addr;
@@ -650,7 +668,7 @@ static uintptr_t user_mem_check_addr;
 //
 // Returns 0 if the user program can access this range of addresses,
 // and -E_FAULT otherwise.
-//
+//x
 int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
@@ -844,6 +862,7 @@ check_page_alloc(void)
 static void
 check_kern_pgdir(void)
 {
+	cprintf("check_kern_pgdir() start!\n");
 	uint32_t i, n;
 	pde_t *pgdir;
 

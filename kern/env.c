@@ -376,11 +376,11 @@ load_icode(struct Env *e, uint8_t *binary)
 	for(; ph < eph; ph++){
 		if(ph->p_type == ELF_PROG_LOAD){ // 只加载type为这个的 段
 			region_alloc(e, (void *)ph->p_va, ph->p_memsz);
-			cprintf("p_va%p memsz %d filesz%d\n",(void *)ph->p_va, ph->p_memsz,ph->p_filesz);
+			// cprintf("p_va%p memsz %d filesz%d\n",(void *)ph->p_va, ph->p_memsz,ph->p_filesz);
 			memcpy((void *)ph->p_va, binary + ph->p_offset, ph->p_filesz);
 		}
 	}
-	cprintf("load end..\n");
+	// cprintf("load end..\n");
 	lcr3(PADDR(kern_pgdir));
 	// do something with entry
 	e->env_tf.tf_eip = elf_header->e_entry;
@@ -550,7 +550,7 @@ env_run(struct Env *e)
 	lcr3(PADDR(e->env_pgdir));
 
 	// step2
+	unlock_kernel();
 	env_pop_tf(&(e->env_tf));
-
 }
 
