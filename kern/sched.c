@@ -41,6 +41,7 @@ sched_yield(void)
 
 	env_run(idle); // 运行找到的idle env
 
+	
 	// sched_halt never returns
 	sched_halt();
 }
