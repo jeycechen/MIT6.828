@@ -298,8 +298,8 @@ region_alloc(struct Env *e, void *va, size_t len)
 	void* end_va = (void *) ROUNDUP(va + len, PGSIZE);
 	// ssize_t l = ROUNDUP(len, PGSIZE); // va + len 向上ROUNDUP
 	// void* end_va = start_va + l;
-	// if((uint32_t)start_va > UTOP) return; // 非法输入 使用了不符合内存布局的地址空间
-	// if((uint32_t)end_va > UTOP) end_va = (void*)UTOP; // 限制
+	if((uint32_t)start_va > UTOP) return; // 非法输入 使用了不符合内存布局的地址空间
+	if((uint32_t)end_va > UTOP) end_va = (void*)UTOP; // 限制
 	struct PageInfo* new_pp;
 	for(; start_va < end_va; start_va += PGSIZE){ // 循环分配物理页
 		if(!(new_pp = page_alloc(ALLOC_ZERO)))
@@ -405,11 +405,10 @@ env_create(uint8_t *binary, enum EnvType type)
 	struct Env* new_env;
 	if(env_alloc(&new_env, 0))
 		panic("env_create: env_alloc failed.");
-	cprintf("new_env id %d\n",new_env->env_id);
+	// cprintf("new_env id %d\n",new_env->env_id);
 	new_env->env_parent_id = 0;
 	new_env->env_type = type;
 	load_icode(new_env, binary);
-	
 }
 
 //

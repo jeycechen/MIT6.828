@@ -32,16 +32,21 @@ sched_yield(void)
 	
 	int cur_env_id = curenv == NULL ? -1 : curenv->env_id; //如果没有curenv 那么从0 开始找（开头）
 	idle = NULL;
-	int i ;
-	for (i = cur_env_id + 1;i < NENV; ++i) {
-		idle = envs + i;
-		if(idle->env_status == ENV_RUNNABLE) break;
+	int i;
+	if(curenv){
+		for(i = curenv->env_id + 1; i != curenv->env_id ;i = (i + 1) % NENV){ //环形寻找，所以需要对NENV取模
+			idle = envs + i;
+			if(idle->env_status == ENV_RUNNABLE) {env_run(idle);}
+		}
+		if(i == curenv->env_id && curenv->env_status == ENV_RUNNING) {idle = curenv;env_run(idle);} // 找完了一圈没找到，并且curenv还在运行，那么让他继续运行
 	}
-	if(i == NENV && idle == NULL && curenv->env_status == ENV_RUNNING) idle = curenv;
+	else{
+		for(i = 0;i < NENV;++i){
+			idle = envs + i;
+			if(idle->env_status == ENV_RUNNABLE) {env_run(idle);}// 运行找到的idle env
+		}
+	}
 
-	env_run(idle); // 运行找到的idle env
-
-	
 	// sched_halt never returns
 	sched_halt();
 }
@@ -53,7 +58,7 @@ void
 sched_halt(void)
 {
 	int i;
-
+	
 	// For debugging and testing purposes, if there are no runnable
 	// environments in the system, then drop into the kernel monitor.
 	for (i = 0; i < NENV; i++) {

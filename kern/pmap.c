@@ -280,8 +280,8 @@ mem_init_mp(void)
 	uint32_t i=0;
     uintptr_t start = KSTACKTOP-KSTKSIZE; 
     for(; i < NCPU; i++){  //  NCPU 被定义为 8， 也就是这个操作系统最多支持8-core
-        boot_map_region(kern_pgdir, start, KSTKSIZE, PADDR(percpu_kstacks[i]), PTE_W | PTE_P);
-        start -= (KSTKSIZE+KSTKGAP);
+        boot_map_region(kern_pgdir, start, KSTKSIZE, PADDR(percpu_kstacks[i]), PTE_W); // 也就是STKSIZE大小的 是实际映射到了物理页面的
+        start -= (KSTKSIZE+KSTKGAP); // 但是STKGAP没有实际的物理页面被映射， 所以如果访问到这里，会发生出错误而不是覆盖其他的栈
     }
 }
 
@@ -344,7 +344,7 @@ page_init(void)
     //第0页用于存放real-mode IDT (interrupt descriptor table)and BIOS structures
     pages[0].pp_ref = 1;
     for (i = 1; i < npages_basemem; i++) {
-		if(i != (int)MPENTRY_PADDR / PGSIZE) { // 这样写是为了让分支预测尽可能对
+		if(i != (int) MPENTRY_PADDR / PGSIZE) { // 这样写是为了让分支预测尽可能对
 			pages[i].pp_ref = 0;
         	pages[i].pp_link = page_free_list; 
         	page_free_list = &pages[i]; // 形成一个链表
@@ -673,7 +673,7 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
-	cprintf("user_mem_check va: %x, len: %x\n", va, len);
+	// cprintf("user_mem_check va: %x, len: %x\n", va, len);
 	uint32_t begin = (uint32_t) ROUNDDOWN(va, PGSIZE); 
 	uint32_t end = (uint32_t) ROUNDUP(va+len, PGSIZE);
 	uint32_t i;
@@ -684,7 +684,7 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 			return -E_FAULT;
 		}
 	}
-	cprintf("user_mem_check success va: %x, len: %x\n", va, len);
+	// cprintf("user_mem_check success va: %x, len: %x\n", va, len);
 	return 0;
 }
 
