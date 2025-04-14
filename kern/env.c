@@ -199,7 +199,7 @@ env_setup_vm(struct Env *e)
 	memcpy(e->env_pgdir, kern_pgdir, PGSIZE);
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
-	e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_P | PTE_U;
+	e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_P | PTE_U; // 如果有真实的物理页面，就可以使用PTE_P 宏
 
 	return 0;
 }
@@ -261,11 +261,11 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 
 	// Enable interrupts while in user mode.
 	// LAB 4: Your code here.
-
+	e->env_tf.tf_eflags |= FL_IF;
 	// Clear the page fault handler until user installs one.
 	e->env_pgfault_upcall = 0;
 
-	// Also clear the IPC receiving flag.
+	// Also clear the IPC receiving flag.s
 	e->env_ipc_recving = 0;
 
 	// commit the allocation
@@ -542,6 +542,7 @@ env_run(struct Env *e)
 	// panic("env_run not yet implemented");
 	
 	// step1
+	cprintf("entry env_run, EFLAGS: %d\n", read_eflags() & FL_IF); 
 	if(curenv && curenv->env_status == ENV_RUNNING) curenv->env_status = ENV_RUNNABLE;
 	curenv = e;
 	e->env_status = ENV_RUNNING;
@@ -550,6 +551,7 @@ env_run(struct Env *e)
 
 	// step2
 	unlock_kernel();
-	env_pop_tf(&(e->env_tf));
+	cprintf("Before env_pop_tf, EFLAGS: %d\n", read_eflags() & FL_IF); // 中断标志位
+	env_pop_tf(&(curenv->env_tf));
 }
 

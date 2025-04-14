@@ -277,10 +277,11 @@ mem_init_mp(void)
 	//     Permissions: kernel RW, user NONE
 	//
 	// LAB 4: Your code here:
+	// 给每个核 分配栈地址空间
 	uint32_t i=0;
     uintptr_t start = KSTACKTOP-KSTKSIZE; 
     for(; i < NCPU; i++){  //  NCPU 被定义为 8， 也就是这个操作系统最多支持8-core
-        boot_map_region(kern_pgdir, start, KSTKSIZE, PADDR(percpu_kstacks[i]), PTE_W); // 也就是STKSIZE大小的 是实际映射到了物理页面的
+        boot_map_region(kern_pgdir, start, KSTKSIZE, PADDR(percpu_kstacks[i]), PTE_W ); // 也就是STKSIZE大小的 是实际映射到了物理页面的
         start -= (KSTKSIZE+KSTKGAP); // 但是STKGAP没有实际的物理页面被映射， 所以如果访问到这里，会发生出错误而不是覆盖其他的栈
     }
 }
@@ -352,7 +353,7 @@ page_init(void)
 		}
         pages[i].pp_ref = 1; // 这里标记 MPENTRY_PADDR已经被使用，
     }
-    // I/O
+    // I/O 设置
     for (i = npages_basemem; i < pages_in_use_end; ++i){
         pages[i].pp_ref = 1;
     }
@@ -361,6 +362,7 @@ page_init(void)
         pages[i].pp_link = page_free_list;
         page_free_list = &pages[i];
     }
+	
 }
 
 //

@@ -152,6 +152,7 @@ trap_init_percpu(void)
 	// ts.ts_ss0 = GD_KD;
 	// ts.ts_iomb = sizeof(struct Taskstate);
 	struct Taskstate *thists = &thiscpu->cpu_ts;
+	
     thists->ts_esp0 = KSTACKTOP - thiscpu->cpu_id * (KSTKSIZE + KSTKGAP);
     thists->ts_ss0 = GD_KD;
     thists->ts_iomb = sizeof(struct Taskstate);
@@ -276,8 +277,8 @@ trap(struct Trapframe *tf)
 	// Check that interrupts are disabled.  If this assertion
 	// fails, DO NOT be tempted to fix it by inserting a "cli" in
 	// the interrupt path.
-	// 检查中断被屏蔽，如果assert失败，不要试图使用"cli" fix it
-	assert(!(read_eflags() & FL_IF));
+	// 检查中断被屏蔽，如果assert失败，不要试图使用"cli" fix it 也就是陷入中断的时候要保证屏蔽了中断，否则会嵌套... 不安全
+	assert(!(read_eflags() & FL_IF)); // 标志位 是 0 才允许通过
 
 	if ((tf->tf_cs & 3) == 3) {
 		// Trapped from user mode.
@@ -370,7 +371,28 @@ page_fault_handler(struct Trapframe *tf)
 	//   (the 'tf' variable points at 'curenv->env_tf').
 
 	// LAB 4: Your code here.
+	if(curenv->env_pgfault_upcall){
+		struct UTrapframe *utf;
+		uintptr_t addr;
+		if(UXSTACKTOP - PGSIZE <= tf->tf_esp && tf->tf_esp < UXSTACKTOP)
+			addr = tf->tf_esp - sizeof(struct UTrapframe) - 4; // 不是第一次， 已经发生嵌套
+		else
+			addr = UXSTACKTOP - sizeof(struct UTrapframe); // 第一次进入use exception stack
+		user_mem_assert(curenv, (void *) addr, sizeof(struct UTrapframe), PTE_W);
+		utf = (struct UTrapframe *)addr;
+		utf->utf_fault_va = fault_va;
+        utf->utf_err = tf->tf_err;
+        utf->utf_regs = tf->tf_regs;
+        utf->utf_eip = tf->tf_eip;//用户能够返回到用户态的设置
+        utf->utf_eflags = tf->tf_eflags;
+        utf->utf_esp = tf->tf_esp;
 
+		// Branch to handler function
+		tf->tf_eip = (uint32_t)curenv->env_pgfault_upcall;
+        tf->tf_esp = addr;
+
+		env_run(curenv);
+	}
 	// Destroy the environment that caused the fault.
 	// 为什么需要destroy 这个env？？ 直接销毁导致页面错误的env
 	

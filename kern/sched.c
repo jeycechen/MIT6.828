@@ -28,27 +28,48 @@ sched_yield(void)
 	// no runnable environments, simply drop through to the code
 	// below to halt the cpu.
 	
-	// LAB 4: Your code here.
-	
-	int cur_env_id = curenv == NULL ? -1 : curenv->env_id; //如果没有curenv 那么从0 开始找（开头）
-	idle = NULL;
-	int i;
-	if(curenv){
-		for(i = curenv->env_id + 1; i != curenv->env_id ;i = (i + 1) % NENV){ //环形寻找，所以需要对NENV取模
-			idle = envs + i;
-			if(idle->env_status == ENV_RUNNABLE) {env_run(idle);}
-		}
-		if(i == curenv->env_id && curenv->env_status == ENV_RUNNING) {idle = curenv;env_run(idle);} // 找完了一圈没找到，并且curenv还在运行，那么让他继续运行
-	}
-	else{
-		for(i = 0;i < NENV;++i){
-			idle = envs + i;
-			if(idle->env_status == ENV_RUNNABLE) {env_run(idle);}// 运行找到的idle env
-		}
-	}
+	// LAB4: your code here.
+	int counter;
+
+    if (curenv) {
+        for (counter = ENVX(curenv->env_id) + 1;
+                counter != ENVX(curenv->env_id);
+                counter = (counter + 1) % NENV){
+            //cprintf("%d\n", counter);
+            if (envs[counter].env_status == ENV_RUNNABLE){
+                env_run(envs + counter);
+            }
+        }
+        if(curenv->env_status != ENV_NOT_RUNNABLE)
+            env_run(curenv);
+            //cprintf("%d\n", counter);
+    } else  {  // curenv 为空 就直接找一个可以运行的运行
+        for (counter = 0; counter < NENV; ++counter)
+            if (envs[counter].env_status == ENV_RUNNABLE)
+                env_run(envs + counter);
+    }
+    // sched_halt never returns
+	// if(curenv) {
+
+	// }
+	// int i = (curenv == NULL) ? 0 : ENVX(curenv->env_id); // 当前env的序号
+	// for (int cnt = 0; cnt < NENV; ++ cnt) { // 环开始找
+	// 	if (envs[i].env_status == ENV_RUNNABLE) {
+	// 		env_run(&envs[i]);
+	// 	}
+	// 	i = (i + 1) % NENV;
+	// }
+	// We can run the environment with the ENV_RUNNING status
+	// only when it is current environment and we cannot find other environment to run
+	// if (curenv != NULL && curenv->env_status == ENV_RUNNING) {
+	// 	env_run(curenv);
+	// }
 
 	// sched_halt never returns
 	sched_halt();
+	
+	// // sched_halt never returns
+	// sched_halt();
 }
 
 // Halt this CPU when there is nothing to do. Wait until the

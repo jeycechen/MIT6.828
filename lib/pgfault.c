@@ -30,6 +30,7 @@ set_pgfault_handler(void (*handler)(struct UTrapframe *utf))
 		// First time through!
 		// LAB 4: Your code here.
 		panic("set_pgfault_handler not implemented");
+		
 	}
 
 	// Save handler pointer for assembly to call.
