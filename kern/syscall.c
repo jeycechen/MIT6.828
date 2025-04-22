@@ -89,11 +89,11 @@ sys_exofork(void)
 	int t_errno = 0;
 	if((t_errno = env_alloc(&new_env,curenv->env_id)) < 0)
 		return t_errno; // 错误则返回
-	new_env->env_status = ENV_NOT_RUNNABLE;
+	new_env->env_status = ENV_NOT_RUNNABLE; //这里还是不可以运行的 exofork创建的还只是一个空白的进程
 	new_env->env_tf = curenv->env_tf;
-	new_env->env_tf.tf_regs.reg_eax = 0; // 子进程的返回值
+	new_env->env_tf.tf_regs.reg_eax = 0; // 子进程的返回值 新的env的返回值
 	
-	return new_env->env_id;
+	return new_env->env_id; // 主进程的返回值
 }
 
 // Set envid's env_status to status, which must be ENV_RUNNABLE
@@ -116,7 +116,7 @@ sys_env_set_status(envid_t envid, int status)
 	// panic("sys_env_set_status not implemented"); 
 	if(status != ENV_RUNNABLE && status != ENV_NOT_RUNNABLE) return -E_INVAL;
 	struct Env *env_store;
-	int ret = envid2env(envid, &env_store, 1);
+	int ret = envid2env(envid, &env_store, 1); // 设置进程状态必须是 自己 或者 父进程
 	if(ret < 0) return ret; //报错返回
 	env_store->env_status = status;
 	return 0;
@@ -136,7 +136,8 @@ sys_env_set_pgfault_upcall(envid_t envid, void *func)
 	// LAB 4: Your code here.
 	// panic("sys_env_set_pgfault_upcall not implemented");
 	struct Env *environment;
-	if(envid2env(envid, &environment, 1)) return -E_BAD_ENV;
+	if(envid2env(envid, &environment, 1) != 0) 
+		return -E_BAD_ENV;
 	environment->env_pgfault_upcall = func;
 	return 0;
 }
@@ -170,18 +171,19 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 	// LAB 4: Your code here.
 
 	// panic("sys_page_alloc not implemented");
-	if(va != ROUNDDOWN(va, PGSIZE)) return -E_INVAL;
-	if((int)va >= UTOP) return -E_INVAL;
-	if((perm & ~PTE_SYSCALL) != 0) return -E_INVAL;
-	if((perm & (PTE_P | PTE_U)) == 0) return -E_INVAL;
+	if(va != ROUNDDOWN(va, PGSIZE)) return -E_INVAL; // 输入的va没有对齐
+	if((int)va >= UTOP) return -E_INVAL; // va超过了mem布局的最大用户地址
+	if((perm & ~PTE_SYSCALL) != 0) return -E_INVAL; //检查权限？
+	if(!(perm & PTE_U) || !(perm & PTE_P)) return -E_INVAL; //PTE_U PTE_P 必须被设置
+	// PTE_SYSCAL = (PTE_AVAIL | PTE_P | PTE_W | PTE_U) 
 	struct PageInfo* newPage = page_alloc(ALLOC_ZERO);
 	if(!newPage) return -E_NO_MEM;
 	struct Env* env_store;
 	int ret = 0;
-	if((ret = envid2env(envid, &env_store, 1)) < 0)
+	if((ret = envid2env(envid, &env_store, 1)) < 0) // 获取ENV 结构体
 		return ret;
-	if((ret = page_insert(env_store->env_pgdir, newPage, va, perm)) < 0){
-		page_free(newPage);
+	if((ret = page_insert(env_store->env_pgdir, newPage, va, perm)) < 0){ // 插入页面
+		page_free(newPage); 
 		return ret;
 	}
 	return 0;
@@ -222,15 +224,17 @@ sys_page_map(envid_t srcenvid, void *srcva,
 	if(envid2env(dstenvid, &dst_env,perm) < 0){
 		return -E_BAD_ENV;
 	}
+	
 	if(src_env == NULL || dst_env == NULL) return -E_BAD_ENV;
 	if((int)srcva >=UTOP || srcva != ROUNDDOWN(srcva, PGSIZE)) return -E_INVAL;
 	if((int)dstva >= UTOP || dstva != ROUNDDOWN(dstva, PGSIZE)) return -E_INVAL;
-	if((perm & ~PTE_SYSCALL) != 0) return -E_INVAL;
+	if((perm & ~PTE_SYSCALL) != 0) return -E_INVAL; // 这里就是判断perm要和PTE_SYSCALL一致 除了PTE_SYSCALL指定的bit位可以有之外，其他的bit位都不允许有值
 	if((perm & (PTE_P | PTE_U)) == 0) return -E_INVAL;
-	if(perm & PTE_W) return -E_INVAL;
 	pte_t *src_pte;
 	struct PageInfo *srcPage;
 	srcPage = page_lookup(src_env->env_pgdir, srcva, &src_pte);
+	if((perm & PTE_W) && !(*src_pte & PTE_W)) return -E_INVAL; // 如果src_pte 不能写 但是perm又有写的权限，报错
+
 	// check src_pte & perm
 	if(page_insert(dst_env->env_pgdir, srcPage, dstva, perm) < 0){
 		return -E_NO_MEM;
@@ -253,7 +257,7 @@ sys_page_unmap(envid_t envid, void *va)
 
 	// LAB 4: Your code here.
 	// panic("sys_page_unmap not implemented");
-	if((int) va > UTOP || (int) va % PGSIZE != 0) return -E_INVAL;
+	if((int) va > UTOP || va != ROUNDDOWN(va, PGSIZE)) return -E_INVAL;
 
 	struct Env *env_store;
 	// 如何检查caller 是否有权限呢？？？
@@ -308,7 +312,37 @@ static int
 sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 {
 	// LAB 4: Your code here.
-	panic("sys_ipc_try_send not implemented");
+	// panic("sys_ipc_try_send not implemented");
+	int ret; 
+	struct Env *target_env_store;
+	if((ret = envid2env(envid, &target_env_store, 0)) < 0) // 无法获取ENV结构体
+		return -E_BAD_ENV;
+	if(!target_env_store->env_ipc_recving) // 目标进程没有阻塞等待
+		return -E_IPC_NOT_RECV;
+	if(srcva < (void *)UTOP && (ROUNDDOWN(srcva, PGSIZE) != 0)) // srcva 没有页对齐
+		return -E_INVAL;
+	if(srcva < (void *)UTOP && (!(perm & PTE_U) || !(perm & PTE_P))) // perm 权限不对
+		return -E_INVAL;
+	if(srcva < (void *)UTOP && (perm & (~PTE_SYSCALL))) // perm 权限不对
+		return -E_INVAL;
+	pte_t *pte;
+	struct PageInfo *page = page_lookup(curenv->env_pgdir, srcva, &pte);
+	if(srcva < (void *)UTOP && !page) // src 没有映射界面，如何查证呢？ # TODO 使用page_lookup
+		return -E_INVAL;
+	// if((perm & PTE_W) && ~(uvpt[PTX(srcva)] & PTE_W)) // perm需要写权限，但是 srcva 只有读的权限
+	// 	return -E_INVAL;
+	if((perm & PTE_W) && ~(*pte & PTE_W)) // perm需要写权限，但是 srcva 只有读的权限
+		return -E_INVAL;
+	// 完成参数校验
+	// 设置目标进程的结构体的值
+	target_env_store->env_ipc_recving = 0;
+	target_env_store->env_ipc_from = curenv->env_id;
+	target_env_store->env_ipc_value = value;
+	target_env_store->env_ipc_perm = srcva < (void *)UTOP ? perm : 0; // 如果有页面需要传送 就是设置为perm 否则设置为0；
+
+	//设置目标进程为可运行，使得可以继续调度；
+	target_env_store->env_status = ENV_RUNNABLE;
+	return 0;
 }
 
 // Block until a value is ready.  Record that you want to receive
@@ -326,7 +360,15 @@ static int
 sys_ipc_recv(void *dstva)
 {
 	// LAB 4: Your code here.
-	panic("sys_ipc_recv not implemented");
+	// panic("sys_ipc_recv not implemented");
+	if(dstva < (void *)UTOP && (ROUNDDOWN(dstva, PGSIZE) != 0))
+		return -E_INVAL;
+	
+	curenv->env_ipc_dstva = dstva;
+	curenv->env_ipc_recving = true;
+	curenv->env_status = ENV_NOT_RUNNABLE; // 标记为不在运行；阻塞等待，同步
+
+	sched_yield();
 	return 0;
 }
 
@@ -343,23 +385,22 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	switch (syscallno) {
 		case SYS_cputs:
 			sys_cputs((char *)a1, (size_t) a2);
-			ret = 0;
-			break;
+			return 0;
 		case SYS_cgetc:
 			ret = sys_cgetc();
-			break;
+			return ret;
 		case SYS_getenvid:
 			ret = sys_getenvid();
-			break;
+			return ret;
 		case SYS_env_destroy:
 			ret = sys_env_destroy(a1);
-			break;
+			return ret;
 		case SYS_yield:
 			sys_yield();
-			return 0;
+			return ret;
 		case SYS_exofork:
 			ret = sys_exofork();
-			break;
+			return ret;
 		case SYS_env_set_status:
             return sys_env_set_status(a1, a2);
         case SYS_page_alloc:
@@ -370,6 +411,10 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
             return sys_page_unmap(a1, (void *) a2);
 		case SYS_env_set_pgfault_upcall:
             return sys_env_set_pgfault_upcall(a1, (void *) a2);
+		case SYS_ipc_try_send:
+			return sys_ipc_try_send(a1,a2,(void *)a3, a4);
+		case SYS_ipc_recv:
+			return sys_ipc_recv((void *)a1);
 		case NSYSCALLS:
 			// 无操作
 			ret = 0;

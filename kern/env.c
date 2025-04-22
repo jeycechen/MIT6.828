@@ -123,6 +123,8 @@ env_init(void)
 	memset(envs, 0, sizeof(envs));
     env_free_list = NULL;
     for (int i = NENV - 1; i >= 0; i--) {
+		envs[i].env_id = 0;
+		envs[i].env_status = ENV_FREE;
         envs[i].env_link = env_free_list;
         env_free_list = envs + i;
     }
@@ -406,8 +408,9 @@ env_create(uint8_t *binary, enum EnvType type)
 	if(env_alloc(&new_env, 0))
 		panic("env_create: env_alloc failed.");
 	// cprintf("new_env id %d\n",new_env->env_id);
-	new_env->env_parent_id = 0;
-	new_env->env_type = type;
+	new_env->env_parent_id = 0;// 0表示当前ID
+	new_env->env_type = type; 
+	// new_env->env_tf.tf_eflags &= ~FL_IF; // TODO FIXME
 	load_icode(new_env, binary);
 }
 
@@ -542,7 +545,6 @@ env_run(struct Env *e)
 	// panic("env_run not yet implemented");
 	
 	// step1
-	cprintf("entry env_run, EFLAGS: %d\n", read_eflags() & FL_IF); 
 	if(curenv && curenv->env_status == ENV_RUNNING) curenv->env_status = ENV_RUNNABLE;
 	curenv = e;
 	e->env_status = ENV_RUNNING;
@@ -551,7 +553,6 @@ env_run(struct Env *e)
 
 	// step2
 	unlock_kernel();
-	cprintf("Before env_pop_tf, EFLAGS: %d\n", read_eflags() & FL_IF); // 中断标志位
-	env_pop_tf(&(curenv->env_tf));
+	env_pop_tf(&(e->env_tf));
 }
 

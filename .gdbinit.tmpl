@@ -29,9 +29,16 @@ target remote localhost:1234
 echo + symbol-file obj/kern/kernel\n
 symbol-file obj/kern/kernel
 
-break *0xf01000c1
-break *0xf01040e1
-break *0xf01034ef
+# break *0xf01000c1
+# break *0xf01040e1
+# break *0xf01034ef
 break _alltraps
+break env_run 
+break sched_yield
+b sched_yield
+b env_pop_tf
+b handler_syscall
+# b i386_init
+b kern/init.c:56
 continue
 layout src

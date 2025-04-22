@@ -29,7 +29,7 @@ sched_yield(void)
 	// below to halt the cpu.
 	
 	// LAB4: your code here.
-	int counter;
+	int counter = 0;
 
     if (curenv) {
         for (counter = ENVX(curenv->env_id) + 1;
@@ -37,39 +37,23 @@ sched_yield(void)
                 counter = (counter + 1) % NENV){
             //cprintf("%d\n", counter);
             if (envs[counter].env_status == ENV_RUNNABLE){
-                env_run(envs + counter);
+                env_run(&envs[counter]);
             }
         }
-        if(curenv->env_status != ENV_NOT_RUNNABLE)
-            env_run(curenv);
+        if(curenv->env_status != ENV_NOT_RUNNABLE){
+			env_run(curenv);
+		}    
             //cprintf("%d\n", counter);
     } else  {  // curenv 为空 就直接找一个可以运行的运行
         for (counter = 0; counter < NENV; ++counter)
-            if (envs[counter].env_status == ENV_RUNNABLE)
-                env_run(envs + counter);
+            if (envs[counter].env_status == ENV_RUNNABLE){
+				cprintf("counter: %d id: %d status:%d\n", counter, envs[counter].env_id , envs[counter].env_status);
+                env_run(&envs[counter]);
+			}		
     }
-    // sched_halt never returns
-	// if(curenv) {
-
-	// }
-	// int i = (curenv == NULL) ? 0 : ENVX(curenv->env_id); // 当前env的序号
-	// for (int cnt = 0; cnt < NENV; ++ cnt) { // 环开始找
-	// 	if (envs[i].env_status == ENV_RUNNABLE) {
-	// 		env_run(&envs[i]);
-	// 	}
-	// 	i = (i + 1) % NENV;
-	// }
-	// We can run the environment with the ENV_RUNNING status
-	// only when it is current environment and we cannot find other environment to run
-	// if (curenv != NULL && curenv->env_status == ENV_RUNNING) {
-	// 	env_run(curenv);
-	// }
 
 	// sched_halt never returns
 	sched_halt();
-	
-	// // sched_halt never returns
-	// sched_halt();
 }
 
 // Halt this CPU when there is nothing to do. Wait until the
@@ -113,7 +97,7 @@ sched_halt(void)
 		"pushl $0\n"
 		"pushl $0\n"
 		// Uncomment the following line after completing exercise 13
-		//"sti\n"
+		"sti\n" // 设置中断标志位 表示可以响应中断
 		"1:\n"
 		"hlt\n"
 		"jmp 1b\n"

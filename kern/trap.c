@@ -72,7 +72,6 @@ trap_init(void)
 	extern struct Segdesc gdt[];
 
     // LAB 3: Your code here.
-	
     void handler_divide();
 	SETGATE(idt[T_DIVIDE], 0, GD_KT, handler_divide, 0);
 	void handler_debug();
@@ -114,6 +113,20 @@ trap_init(void)
 	void handler_default();
 	SETGATE(idt[T_DEFAULT], 0, GD_KT, handler_default, 0);
 	
+	// 这里是增加的硬件中断
+	void handler_timer();
+	void handler_kbd();
+	void handler_serial();
+	void handler_spurious();
+	void handler_ide();
+	void handler_error();
+	
+	SETGATE(idt[IRQ_OFFSET + IRQ_TIMER],    0, GD_KT, handler_timer,    0);
+	SETGATE(idt[IRQ_OFFSET + IRQ_KBD],      0, GD_KT, handler_kbd,      0);
+	SETGATE(idt[IRQ_OFFSET + IRQ_SERIAL],   0, GD_KT, handler_serial,   0);
+	SETGATE(idt[IRQ_OFFSET + IRQ_SPURIOUS], 0, GD_KT, handler_spurious, 0);
+	SETGATE(idt[IRQ_OFFSET + IRQ_IDE],      0, GD_KT, handler_ide,      0);
+	SETGATE(idt[IRQ_OFFSET + IRQ_ERROR],    0, GD_KT, handler_error,    0);
 	// Per-CPU setup 
 	trap_init_percpu();
 }
@@ -153,7 +166,8 @@ trap_init_percpu(void)
 	// ts.ts_iomb = sizeof(struct Taskstate);
 	struct Taskstate *thists = &thiscpu->cpu_ts;
 	
-    thists->ts_esp0 = KSTACKTOP - thiscpu->cpu_id * (KSTKSIZE + KSTKGAP);
+    // thists->ts_esp0 = KSTACKTOP - thiscpu->cpu_id * (KSTKSIZE + KSTKGAP);
+	thists->ts_esp0 = (uintptr_t) percpu_kstacks[cpunum()];
     thists->ts_ss0 = GD_KD;
     thists->ts_iomb = sizeof(struct Taskstate);
 	// Initialize the TSS slot of the gdt.
@@ -222,7 +236,7 @@ trap_dispatch(struct Trapframe *tf)
 	// LAB 3: Your code here.
 	// cprintf("trap_dispatch.. \n");
 	if(tf->tf_trapno == T_PGFLT){
-		cprintf("page_fault handler\n");
+		// cprintf("page_fault handler\n");
 		page_fault_handler(tf);
 		return;
 	}
@@ -235,7 +249,7 @@ trap_dispatch(struct Trapframe *tf)
 		return;
 	}
 	
-	// Handle spurious interrupts
+	// Handle spurious interrupts // 虚假中断 IRQ line上的噪声
 	// The hardware sometimes raises these because of noise on the
 	// IRQ line or other reasons. We don't care.
 	if (tf->tf_trapno == IRQ_OFFSET + IRQ_SPURIOUS) {
@@ -243,15 +257,25 @@ trap_dispatch(struct Trapframe *tf)
 		print_trapframe(tf);
 		return;
 	}
-
+	
 	// Handle clock interrupts. Don't forget to acknowledge the
 	// interrupt using lapic_eoi() before calling the scheduler!
 	// LAB 4: Your code here.
-
+	// 时钟中断 
+	if(tf->tf_trapno == IRQ_OFFSET + IRQ_TIMER){
+		lapic_eoi(); // lapic local advanced programmable interrupt contrloller
+		// 硬件设备产生中断的时候 中断控制器会接受信号，然后传递给CPU，CPU响应中断之后，会暂停当前任务，去执行中断处理程序
+		// CPU完成处理之后， 告知lapic处理完毕，以便处理后续的中断。lapic_eoi就是用来通知lapci的 （eoi, end of interrupt）
+		// 会向本地lapic发送一个EOI信号，1：清楚中断标志位 2、允许后续中断
+		sched_yield();
+		return;
+	}
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
-	if (tf->tf_cs == GD_KT)
+	if (tf->tf_cs == GD_KT){
 		panic("unhandled trap in kernel");
+		return;
+	}
 	else {
 		env_destroy(curenv);
 		return;
@@ -278,9 +302,10 @@ trap(struct Trapframe *tf)
 	// fails, DO NOT be tempted to fix it by inserting a "cli" in
 	// the interrupt path.
 	// 检查中断被屏蔽，如果assert失败，不要试图使用"cli" fix it 也就是陷入中断的时候要保证屏蔽了中断，否则会嵌套... 不安全
-	assert(!(read_eflags() & FL_IF)); // 标志位 是 0 才允许通过
+	// cprintf("assert %s \n",read_eflags() & FL_IF);
+	assert(!(read_eflags() & FL_IF)); // 标志位 是 0 才允许通过 TODO
 
-	if ((tf->tf_cs & 3) == 3) {
+	if ((tf->tf_cs & 3) == 3) { // 用户导致的中断
 		// Trapped from user mode.
 		// Acquire the big kernel lock before doing any
 		// serious kernel work.
@@ -298,7 +323,7 @@ trap(struct Trapframe *tf)
 		// Copy trap frame (which is currently on the stack)
 		// into 'curenv->env_tf', so that running the environment
 		// will restart at the trap point.
-		curenv->env_tf = *tf; // 保存curenv使用的trapfram方便恢复秩序
+		curenv->env_tf = *tf; // 保存curenv使用的trapfram方便恢复
 		// The trapframe on the stack should be ignored from here on.
 		tf = &curenv->env_tf; // 这里是在干嘛？ 是否有些多余
 		// 在这里，tf复制到了curenv里面，这是放在内核的全局变量的，比较稳定
@@ -324,7 +349,7 @@ trap(struct Trapframe *tf)
 
 
 void
-page_fault_handler(struct Trapframe *tf)
+page_fault_handler(struct Trapframe *tf) // 这里是一个内核级别中断
 {
 	uint32_t fault_va;
 	// Read processor's CR2 register to find the faulting address
@@ -335,7 +360,7 @@ page_fault_handler(struct Trapframe *tf)
 	// LAB 3: Your code here.
 	// return;
 
-	if((tf->tf_cs & 3) == 0)
+	if((tf->tf_cs & 3) == 0) // 内核页面 出错 直接寄
 		panic("Page fault in kernel-mode\n");
 
 	// We've already handled kernel-mode exceptions, so if we get here,
@@ -371,27 +396,33 @@ page_fault_handler(struct Trapframe *tf)
 	//   (the 'tf' variable points at 'curenv->env_tf').
 
 	// LAB 4: Your code here.
-	if(curenv->env_pgfault_upcall){
-		struct UTrapframe *utf;
+	if(curenv->env_pgfault_upcall){ // 用户注册的中断处理函数非空
+		struct UTrapframe *utf; // 用户级别中断 帧
 		uintptr_t addr;
+		// UXSTKTOP  high
+		//				PG <------ tf->esp 如果在这里说明就是多次发生了用户级中断， 发生嵌套
+		// 				PG
+		// USTKTOP   low
 		if(UXSTACKTOP - PGSIZE <= tf->tf_esp && tf->tf_esp < UXSTACKTOP)
 			addr = tf->tf_esp - sizeof(struct UTrapframe) - 4; // 不是第一次， 已经发生嵌套
+			// 为什么这里需要额外-4 ？方便恢复现场
 		else
-			addr = UXSTACKTOP - sizeof(struct UTrapframe); // 第一次进入use exception stack
-		user_mem_assert(curenv, (void *) addr, sizeof(struct UTrapframe), PTE_W);
+			addr = UXSTACKTOP - sizeof(struct UTrapframe); // 第一次进入user exception stack
+		user_mem_assert(curenv, (void *) addr, sizeof(struct UTrapframe), PTE_W | PTE_P | PTE_U);
+		// 构建utf
 		utf = (struct UTrapframe *)addr;
 		utf->utf_fault_va = fault_va;
         utf->utf_err = tf->tf_err;
         utf->utf_regs = tf->tf_regs;
-        utf->utf_eip = tf->tf_eip;//用户能够返回到用户态的设置
+        utf->utf_eip = tf->tf_eip; //用户能够返回到用户态的设置
         utf->utf_eflags = tf->tf_eflags;
         utf->utf_esp = tf->tf_esp;
 
 		// Branch to handler function
-		tf->tf_eip = (uint32_t)curenv->env_pgfault_upcall;
-        tf->tf_esp = addr;
+		curenv->env_tf.tf_eip = (uint32_t) curenv->env_pgfault_upcall;
+        curenv->env_tf.tf_esp = addr; 
 
-		env_run(curenv);
+		env_run(curenv); //继续运行？其实就会执行 curenv->env_pgfault_upcall;
 	}
 	// Destroy the environment that caused the fault.
 	// 为什么需要destroy 这个env？？ 直接销毁导致页面错误的env

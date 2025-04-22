@@ -47,7 +47,7 @@
 /*
  * Lab 3: Your code here for generating entry points for the different traps.
  */
- 
+	// 这里是系统调用 中断
 	TRAPHANDLER_NOEC(handler_divide, T_DIVIDE)
 	TRAPHANDLER_NOEC(handler_debug, T_DEBUG)
 	TRAPHANDLER_NOEC(handler_nmi, T_NMI)
@@ -68,30 +68,27 @@
 	TRAPHANDLER_NOEC(handler_simderr, T_SIMDERR)
 	TRAPHANDLER_NOEC(handler_syscall, T_SYSCALL)
 	TRAPHANDLER_NOEC(handler_default, T_DEFAULT)
+	
+	// 这里是硬件中断
+	TRAPHANDLER_NOEC(handler_timer,    IRQ_OFFSET + IRQ_TIMER)
+	TRAPHANDLER_NOEC(handler_kbd,      IRQ_OFFSET + IRQ_KBD)
+	TRAPHANDLER_NOEC(handler_serial,   IRQ_OFFSET + IRQ_SERIAL)
+	TRAPHANDLER_NOEC(handler_spurious, IRQ_OFFSET + IRQ_SPURIOUS)
+	TRAPHANDLER_NOEC(handler_ide,      IRQ_OFFSET + IRQ_IDE)
+	TRAPHANDLER_NOEC(handler_error,    IRQ_OFFSET + IRQ_ERROR)
 
 /*
  * Lab 3: Your code here for _alltraps
  */
- /* 
-@ .global _alltraps
-@ _alltraps:
-@ 	pushl %ds
-@ 	pushl %es
-@ 	pushal
-@ 	pushl $GD_KD
-@ 	popl %ds
-@ 	pushl $GD_KD
-@ 	popl %es
-@ 	pushl %esp
-@ 	call trap
-*/
 _alltraps:
     pushl %ds
     pushl %es
     pushal
+
     movw $GD_KD, %ax
     movw %ax, %ds
     movw %ax, %es
+	
     pushl %esp
     call trap
 

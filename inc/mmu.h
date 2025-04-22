@@ -55,13 +55,13 @@
 #define PDXSHIFT	22		// offset of PDX in a linear address
 
 // Page table/directory entry flags.
-#define PTE_P		0x001	// Present
-#define PTE_W		0x002	// Writeable
-#define PTE_U		0x004	// User
-#define PTE_PWT		0x008	// Write-Through
-#define PTE_PCD		0x010	// Cache-Disable
-#define PTE_A		0x020	// Accessed
-#define PTE_D		0x040	// Dirty
+#define PTE_P		0x001	// Present 是否在内存中
+#define PTE_W		0x002	// Writeable 是否可写
+#define PTE_U		0x004	// User 页面的访问权限是用户模式还是内核模式
+#define PTE_PWT		0x008	// Write-Through 写通1 保持cache和物理内存的内容一致 写回0
+#define PTE_PCD		0x010	// Cache-Disable 不允许缓存 直接访问物理内存 目的是为了保证多核情况下的数据一致性，以及以内存映射的方式访问IO寄存器
+#define PTE_A		0x020	// Accessed 访问标志位， 
+#define PTE_D		0x040	// Dirty 如果需要进行页面换出，os会检查这个标志位，如果为1，就会先将内存中的内容写入到磁盘保证数据一致性
 #define PTE_PS		0x080	// Page Size
 #define PTE_G		0x100	// Global
 

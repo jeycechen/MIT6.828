@@ -7,6 +7,8 @@
         "monitor.h": "c",
         "cpu.h": "c",
         "x86.h": "c",
-        "types.h": "c"
+        "types.h": "c",
+        "memlayout.h": "c",
+        "lib.h": "c"
     }
 }

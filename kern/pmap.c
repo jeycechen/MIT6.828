@@ -279,10 +279,10 @@ mem_init_mp(void)
 	// LAB 4: Your code here:
 	// 给每个核 分配栈地址空间
 	uint32_t i=0;
-    uintptr_t start = KSTACKTOP-KSTKSIZE; 
+    uintptr_t start = KSTACKTOP - KSTKSIZE; 
     for(; i < NCPU; i++){  //  NCPU 被定义为 8， 也就是这个操作系统最多支持8-core
         boot_map_region(kern_pgdir, start, KSTKSIZE, PADDR(percpu_kstacks[i]), PTE_W ); // 也就是STKSIZE大小的 是实际映射到了物理页面的
-        start -= (KSTKSIZE+KSTKGAP); // 但是STKGAP没有实际的物理页面被映射， 所以如果访问到这里，会发生出错误而不是覆盖其他的栈
+        start -= (KSTKSIZE + KSTKGAP); // 但是STKGAP没有实际的物理页面被映射， 所以如果访问到这里，会发生出错误而不是覆盖其他的栈
     }
 }
 
@@ -344,6 +344,7 @@ page_init(void)
     cprintf("%08x %08x\n", pages, (uint32_t)boot_alloc(0));
     //第0页用于存放real-mode IDT (interrupt descriptor table)and BIOS structures
     pages[0].pp_ref = 1;
+	pages[0].pp_link = NULL;
     for (i = 1; i < npages_basemem; i++) {
 		if(i != (int) MPENTRY_PADDR / PGSIZE) { // 这样写是为了让分支预测尽可能对
 			pages[i].pp_ref = 0;
@@ -641,14 +642,15 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	uintptr_t ret = base;
-	size_t aligned_size = ROUNDUP(size, PGSIZE);
-	base += aligned_size; // 移动可用的虚拟地址base
-	if(base > MMIOLIM) panic("func mmio_map_region: arg size is too big, illegal...");
-	boot_map_region(kern_pgdir, ret, aligned_size, pa, PTE_PCD | PTE_PWT | PTE_W); // 这个地址是一个device，所以cache是unsafe的，必须使用
+	if(base + ROUNDUP(size, PGSIZE) > MMIOLIM)
+        panic("mmio_map_region: mmio overflow.");
+    boot_map_region(kern_pgdir, base, ROUNDUP(size, PGSIZE), pa, PTE_W|PTE_PCD|PTE_PWT);
+	// 这个地址是一个device，所以cache是unsafe的，必须使用
 	// PTE_PCD | PTE_PWT 来告诉cpu这是不可信赖的，cache-disable & write-through
 	// 函数功能是要返回一个可以被mmio的一个虚拟地址，这个虚拟地址被映射到一个物理地址pa
-	return (void *)ret;
+    uintptr_t temp = base;
+    base += ROUNDUP(size, PGSIZE);
+    return (void *)temp;
 }
 
 static uintptr_t user_mem_check_addr;
