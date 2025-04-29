@@ -313,33 +313,40 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 {
 	// LAB 4: Your code here.
 	// panic("sys_ipc_try_send not implemented");
+	
 	int ret; 
 	struct Env *target_env_store;
 	if((ret = envid2env(envid, &target_env_store, 0)) < 0) // 无法获取ENV结构体
 		return -E_BAD_ENV;
 	if(!target_env_store->env_ipc_recving) // 目标进程没有阻塞等待
 		return -E_IPC_NOT_RECV;
-	if(srcva < (void *)UTOP && (ROUNDDOWN(srcva, PGSIZE) != 0)) // srcva 没有页对齐
+	if(srcva < (void *)UTOP && (ROUNDDOWN(srcva, PGSIZE) != srcva)) // srcva 没有页对齐
 		return -E_INVAL;
 	if(srcva < (void *)UTOP && (!(perm & PTE_U) || !(perm & PTE_P))) // perm 权限不对
 		return -E_INVAL;
 	if(srcva < (void *)UTOP && (perm & (~PTE_SYSCALL))) // perm 权限不对
 		return -E_INVAL;
+	
 	pte_t *pte;
 	struct PageInfo *page = page_lookup(curenv->env_pgdir, srcva, &pte);
-	if(srcva < (void *)UTOP && !page) // src 没有映射界面，如何查证呢？ # TODO 使用page_lookup
+	if(srcva < (void *)UTOP && !page) // src 没有映射界面，如何查证呢？ 使用page_lookup
 		return -E_INVAL;
-	// if((perm & PTE_W) && ~(uvpt[PTX(srcva)] & PTE_W)) // perm需要写权限，但是 srcva 只有读的权限
-	// 	return -E_INVAL;
-	if((perm & PTE_W) && ~(*pte & PTE_W)) // perm需要写权限，但是 srcva 只有读的权限
-		return -E_INVAL;
+
+	if(srcva < (void *) UTOP && (perm & PTE_W) && (*pte & PTE_W) == 0) // perm需要写权限，但是 srcva 只有读的权限
+		{	cprintf("11111");
+			return -E_INVAL;}
 	// 完成参数校验
-	// 设置目标进程的结构体的值
+	if( target_env_store->env_ipc_dstva < (void *) UTOP) {
+		if(page_insert(target_env_store->env_pgdir, page, target_env_store->env_ipc_dstva, perm) < 0) return -E_NO_MEM;
+		target_env_store->env_ipc_perm = perm; // 如果有页面需要传送 就是设置为perm 
+	} else{
+		target_env_store->env_ipc_perm = 0; // 否则设置为0；
+	}
+	// 这里就是 发送成功，设置目标进程的结构体的值
 	target_env_store->env_ipc_recving = 0;
 	target_env_store->env_ipc_from = curenv->env_id;
 	target_env_store->env_ipc_value = value;
-	target_env_store->env_ipc_perm = srcva < (void *)UTOP ? perm : 0; // 如果有页面需要传送 就是设置为perm 否则设置为0；
-
+	target_env_store->env_tf.tf_regs.reg_eax = 0;
 	//设置目标进程为可运行，使得可以继续调度；
 	target_env_store->env_status = ENV_RUNNABLE;
 	return 0;
@@ -361,8 +368,9 @@ sys_ipc_recv(void *dstva)
 {
 	// LAB 4: Your code here.
 	// panic("sys_ipc_recv not implemented");
-	if(dstva < (void *)UTOP && (ROUNDDOWN(dstva, PGSIZE) != 0))
+	if((size_t)dstva < UTOP && (ROUNDDOWN(dstva, PGSIZE) != dstva)){ 
 		return -E_INVAL;
+	}
 	
 	curenv->env_ipc_dstva = dstva;
 	curenv->env_ipc_recving = true;

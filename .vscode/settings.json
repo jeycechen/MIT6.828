@@ -9,6 +9,7 @@
         "x86.h": "c",
         "types.h": "c",
         "memlayout.h": "c",
-        "lib.h": "c"
+        "lib.h": "c",
+        "syscall.h": "c"
     }
 }

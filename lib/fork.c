@@ -104,7 +104,8 @@ fork(void)
 	if(env_id < 0) 
 		panic("fork: sys_exofork failed.");
 	if(env_id == 0){ // 0 表示 子进程 也就是子进程更新thisenv 然后ret
-		thisenv = envs + ENVX(sys_getenvid());
+		// thisenv = envs + ENVX(sys_getenvid());
+		thisenv = &envs[ENVX(sys_getenvid())];
 		return 0;
 	}
 	uint32_t addr; // 这里是父进程 父进程的环境 env_id 返回的是 子进程的env_id

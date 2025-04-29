@@ -32,13 +32,17 @@ symbol-file obj/kern/kernel
 # break *0xf01000c1
 # break *0xf01040e1
 # break *0xf01034ef
-break _alltraps
-break env_run 
-break sched_yield
-b sched_yield
-b env_pop_tf
-b handler_syscall
+# break _alltraps
+# break env_run 
+# break sched_yield
+# b sched_yield
+# b env_pop_tf
+# b handler_syscall
+# b sched_halt
 # b i386_init
 b kern/init.c:56
+b kern/init.c:70
+
+b kern/sched.c:51
 continue
 layout src

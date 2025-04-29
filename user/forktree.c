@@ -8,7 +8,7 @@ void forktree(const char *cur);
 
 void
 forkchild(const char *cur, char branch)
-{
+{	
 	char nxt[DEPTH+1];
 
 	if (strlen(cur) >= DEPTH)
@@ -23,7 +23,7 @@ forkchild(const char *cur, char branch)
 
 void
 forktree(const char *cur)
-{
+{	
 	cprintf("%04x: I am '%s'\n", sys_getenvid(), cur);
 	forkchild(cur, '0');
 	
@@ -33,7 +33,7 @@ forktree(const char *cur)
 
 void
 umain(int argc, char **argv)
-{
+{	
 	forktree("");
 }
 

@@ -30,8 +30,7 @@ set_pgfault_handler(void (*handler)(struct UTrapframe *utf))
 		// First time through!
 		// LAB 4: Your code here.
 		// panic("set_pgfault_handler not implemented");
-		envid_t envid = sys_getenvid();
-		if(sys_page_alloc(envid, (void *)(UXSTACKTOP - PGSIZE), PTE_U | PTE_W | PTE_P) < 0) // 分配UXSTK页面
+		if(sys_page_alloc(thisenv->env_id, (void *)(UXSTACKTOP - PGSIZE), PTE_U | PTE_W | PTE_P) < 0) // 分配UXSTK页面
 			panic("set_pgfault_handler: sys_page_alloc failed.");
 		if(sys_env_set_pgfault_upcall(thisenv->env_id, _pgfault_upcall) < 0) // 设置
 			panic("set_pgfault_handler: sys_env_set_pgfault_upcall failed."); 

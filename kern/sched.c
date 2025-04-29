@@ -47,7 +47,6 @@ sched_yield(void)
     } else  {  // curenv 为空 就直接找一个可以运行的运行
         for (counter = 0; counter < NENV; ++counter)
             if (envs[counter].env_status == ENV_RUNNABLE){
-				cprintf("counter: %d id: %d status:%d\n", counter, envs[counter].env_id , envs[counter].env_status);
                 env_run(&envs[counter]);
 			}		
     }

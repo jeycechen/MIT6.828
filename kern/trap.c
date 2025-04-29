@@ -109,7 +109,7 @@ trap_init(void)
 	void handler_simderr();
 	SETGATE(idt[T_SIMDERR], 0, GD_KT, handler_simderr, 0);
 	void handler_syscall();
-	SETGATE(idt[T_SYSCALL], 1, GD_KT, handler_syscall, 3);
+	SETGATE(idt[T_SYSCALL], 0, GD_KT, handler_syscall, 3);
 	void handler_default();
 	SETGATE(idt[T_DEFAULT], 0, GD_KT, handler_default, 0);
 	
@@ -303,6 +303,10 @@ trap(struct Trapframe *tf)
 	// the interrupt path.
 	// 检查中断被屏蔽，如果assert失败，不要试图使用"cli" fix it 也就是陷入中断的时候要保证屏蔽了中断，否则会嵌套... 不安全
 	// cprintf("assert %s \n",read_eflags() & FL_IF);
+	// IF标志位 置位 表示允许 响应外部的可屏蔽中断请求， 否则 0 就是不允许响应外部的可屏蔽中断
+	// cprintf("tf_eip: %x\n", tf->tf_eip);
+	// cprintf("tf_trapno: %s\n",trapname(tf->tf_trapno));
+	// cprintf("syscallno: %d\n",tf->tf_regs.reg_eax);
 	assert(!(read_eflags() & FL_IF)); // 标志位 是 0 才允许通过 TODO
 
 	if ((tf->tf_cs & 3) == 3) { // 用户导致的中断
