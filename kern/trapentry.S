@@ -47,10 +47,48 @@
 /*
  * Lab 3: Your code here for generating entry points for the different traps.
  */
-
-
+	// 这里是系统调用 中断
+	TRAPHANDLER_NOEC(handler_divide, T_DIVIDE)
+	TRAPHANDLER_NOEC(handler_debug, T_DEBUG)
+	TRAPHANDLER_NOEC(handler_nmi, T_NMI)
+	TRAPHANDLER_NOEC(handler_brkpt, T_BRKPT)
+	TRAPHANDLER_NOEC(handler_oflow, T_OFLOW)
+	TRAPHANDLER_NOEC(handler_bound, T_BOUND)
+	TRAPHANDLER_NOEC(handler_illop, T_ILLOP)
+	TRAPHANDLER_NOEC(handler_device, T_DEVICE)
+	TRAPHANDLER(handler_dblflt, T_DBLFLT)
+	TRAPHANDLER(handler_tss, T_TSS)
+	TRAPHANDLER(handler_segnp, T_SEGNP)
+	TRAPHANDLER(handler_stack, T_STACK)
+	TRAPHANDLER(handler_gpflt, T_GPFLT)
+	TRAPHANDLER(handler_pgflt, T_PGFLT)
+	TRAPHANDLER_NOEC(handler_fperr, T_FPERR)
+	TRAPHANDLER(handler_align, T_ALIGN)
+	TRAPHANDLER_NOEC(handler_mchk, T_MCHK)
+	TRAPHANDLER_NOEC(handler_simderr, T_SIMDERR)
+	TRAPHANDLER_NOEC(handler_syscall, T_SYSCALL)
+	TRAPHANDLER_NOEC(handler_default, T_DEFAULT)
+	
+	// 这里是硬件中断
+	TRAPHANDLER_NOEC(handler_timer,    IRQ_OFFSET + IRQ_TIMER)
+	TRAPHANDLER_NOEC(handler_kbd,      IRQ_OFFSET + IRQ_KBD)
+	TRAPHANDLER_NOEC(handler_serial,   IRQ_OFFSET + IRQ_SERIAL)
+	TRAPHANDLER_NOEC(handler_spurious, IRQ_OFFSET + IRQ_SPURIOUS)
+	TRAPHANDLER_NOEC(handler_ide,      IRQ_OFFSET + IRQ_IDE)
+	TRAPHANDLER_NOEC(handler_error,    IRQ_OFFSET + IRQ_ERROR)
 
 /*
  * Lab 3: Your code here for _alltraps
  */
+_alltraps:
+    pushl %ds
+    pushl %es
+    pushal
+
+    movw $GD_KD, %ax
+    movw %ax, %ds
+    movw %ax, %es
+	
+    pushl %esp
+    call trap
 

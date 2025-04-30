@@ -41,13 +41,17 @@ umain(int argc, char **argv)
 	int i, id;
 
 	// fork the first prime process in the chain
+	cprintf("phase1\n");
 	if ((id = fork()) < 0)
 		panic("fork: %e", id);
+	cprintf("phase2\n");
 	if (id == 0)
 		primeproc();
-
+	cprintf("phase3\n");
 	// feed all the integers through
 	for (i = 2; ; i++)
-		ipc_send(id, i, 0, 0);
+		{cprintf("phase111\n");
+		ipc_send(id, i, 0, 0);}
+	cprintf("phase4\n");
 }
 

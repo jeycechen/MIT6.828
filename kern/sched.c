@@ -28,8 +28,29 @@ sched_yield(void)
 	// another CPU (env_status == ENV_RUNNING). If there are
 	// no runnable environments, simply drop through to the code
 	// below to halt the cpu.
+	
+	// LAB4: your code here.
+	int counter = 0;
 
-	// LAB 4: Your code here.
+    if (curenv) {
+        for (counter = ENVX(curenv->env_id) + 1;
+                counter != ENVX(curenv->env_id);
+                counter = (counter + 1) % NENV){
+            //cprintf("%d\n", counter);
+            if (envs[counter].env_status == ENV_RUNNABLE){
+                env_run(&envs[counter]);
+            }
+        }
+        if(curenv->env_status != ENV_NOT_RUNNABLE){
+			env_run(curenv);
+		}    
+            //cprintf("%d\n", counter);
+    } else  {  // curenv 为空 就直接找一个可以运行的运行
+        for (counter = 0; counter < NENV; ++counter)
+            if (envs[counter].env_status == ENV_RUNNABLE){
+                env_run(&envs[counter]);
+			}		
+    }
 
 	// sched_halt never returns
 	sched_halt();
@@ -42,7 +63,7 @@ void
 sched_halt(void)
 {
 	int i;
-
+	
 	// For debugging and testing purposes, if there are no runnable
 	// environments in the system, then drop into the kernel monitor.
 	for (i = 0; i < NENV; i++) {
@@ -76,7 +97,7 @@ sched_halt(void)
 		"pushl $0\n"
 		"pushl $0\n"
 		// Uncomment the following line after completing exercise 13
-		//"sti\n"
+		"sti\n" // 设置中断标志位 表示可以响应中断
 		"1:\n"
 		"hlt\n"
 		"jmp 1b\n"
