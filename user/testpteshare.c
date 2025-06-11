@@ -24,7 +24,7 @@ umain(int argc, char **argv)
 	if (r == 0) {
 		strcpy(VA, msg);
 		exit();
-	}
+	} 
 	wait(r);
 	cprintf("fork handles PTE_SHARE %s\n", strcmp(VA, msg) == 0 ? "right" : "wrong");
 

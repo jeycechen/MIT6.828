@@ -66,9 +66,13 @@ duppage(envid_t envid, unsigned pn)
 	// LAB 4: Your code here.
 	// panic("duppage not implemented");
 	void *addr = (void *)(pn * PGSIZE);
-	if((uvpt[pn] & PTE_W) || (uvpt[pn] & PTE_COW)){
+	if(uvpt[pn] & PTE_SHARE){
+		if(sys_page_map(0, addr, envid, addr, PTE_SYSCALL) < 0)
+			panic("duppage: meet err when process PTE_SHARE ");
+	}
+	else if((uvpt[pn] & PTE_W) || (uvpt[pn] & PTE_COW)){
 		if(sys_page_map(0, addr, envid, addr, PTE_U | PTE_P | PTE_COW) < 0) // 为什么这里是0，0代表当前的env（进程）吗
-			panic("duppage: patent->child sys_page_map failed.");
+			panic("duppage: parent->child sys_page_map failed.");
 		if(sys_page_map(0, addr, 0, addr, PTE_U | PTE_COW | PTE_P) < 0)  // 重新标记为PTE_COW， 为什么需要重新标记 多核 + 多进程？
 			panic("duppage: single sys_page_map failed.");
 	} else { // 否则这个页面就是只读的 只需要映射就行（复制）

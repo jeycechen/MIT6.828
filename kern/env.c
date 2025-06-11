@@ -413,6 +413,9 @@ env_create(uint8_t *binary, enum EnvType type)
 	// cprintf("new_env id %d\n",new_env->env_id);
 	new_env->env_parent_id = 0;// 0表示当前ID
 	new_env->env_type = type; 
+	if(type == ENV_TYPE_FS){ // 如果是这个进程是一个文件操作系统。赋予相应的权限
+		new_env->env_tf.tf_eflags |= FL_IOPL_MASK;
+	}
 	// new_env->env_tf.tf_eflags &= ~FL_IF; // TODO FIXME
 	load_icode(new_env, binary);
 }
