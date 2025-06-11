@@ -31,7 +31,7 @@ syscall(int num, int check, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 		       "S" (a5)
 		     : "cc", "memory");
 
-	if(check && ret > 0)
+	if(check && ret > 0) // 这里应该是报告 syscall 有错误
 		panic("syscall %d returned %d (> 0)", num, ret);
 
 	return ret;

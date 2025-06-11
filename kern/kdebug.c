@@ -100,6 +100,7 @@ stab_binsearch(const struct Stab *stabs, int *region_left, int *region_right,
 			/* do nothing */;
 		*region_left = l;
 	}
+	
 }
 
 
@@ -124,7 +125,7 @@ debuginfo_eip(uintptr_t addr, struct Eipdebuginfo *info)
 	info->eip_fn_namelen = 9;
 	info->eip_fn_addr = addr;
 	info->eip_fn_narg = 0;
-
+	
 	// Find the relevant set of stabs
 	if (addr >= ULIM) {
 		stabs = __STAB_BEGIN__;
@@ -150,6 +151,8 @@ debuginfo_eip(uintptr_t addr, struct Eipdebuginfo *info)
 
 		// Make sure the STABS and string table memory is valid.
 		// LAB 3: Your code here.
+		if(user_mem_check(curenv, usd, sizeof(struct UserStabData), PTE_U))
+			return -1;
 	}
 
 	// String table validity checks
@@ -205,6 +208,8 @@ debuginfo_eip(uintptr_t addr, struct Eipdebuginfo *info)
 	//	which one.
 	// Your code here.
 
+	stab_binsearch(stabs, &lline, &rline, N_SLINE, addr);
+	info->eip_line = lline > rline ? -1 : stabs[lline].n_desc;
 
 	// Search backwards from the line number for the relevant filename
 	// stab.

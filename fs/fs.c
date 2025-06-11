@@ -3,6 +3,8 @@
 
 #include "fs.h"
 
+struct Super *super;
+uint32_t *bitmap;
 // --------------------------------------------------------------
 // Super block
 // --------------------------------------------------------------
@@ -62,7 +64,20 @@ alloc_block(void)
 	// super->s_nblocks blocks in the disk altogether.
 
 	// LAB 5: Your code here.
-	panic("alloc_block not implemented");
+	uint32_t bmpblock_start = 2; //为什么是2？ 0 bootsector, 1 super block, 2 bitmap
+	for(uint32_t blockno = 0; blockno < super->s_nblocks; blockno++){ // 这里的blockno 实际上是可以使用的数据块，不含位图块 + 0 1 块
+		if (block_is_free(blockno)) {					//搜索free的block
+			bitmap[blockno / 32] &= ~(1 << (blockno % 32));		//标记为已使用
+			flush_block(diskaddr(bmpblock_start + (blockno / 32) / NINDIRECT));	//TODO 将刚刚修改的bitmap block写到磁盘中
+			// (blockno / 32) / NINDIRECT. 这是使用数据块号（逻辑块）的no. 来计算实际的物理块的no
+			// blockno / 32 需要多少个4B, 这里也是bitmap的索引，bitmap一个数组，每个元素是一个4字节的uint32，可以标记32个逻辑块的使用情况
+			// NINDIRECT 一个位图块 能够容下多少个4B
+			// (blockno / 32) / NINDIRECT. 需要多少个位图块. 
+			// 2 + (blockno / 32) / NINDIRECT 数据块号（逻辑块） 所对应的物理块号
+			return blockno;
+		}
+	}
+	// panic("alloc_block not implemented");
 	return -E_NO_DISK;
 }
 
@@ -134,8 +149,30 @@ fs_init(void)
 static int
 file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool alloc)
 {
-       // LAB 5: Your code here.
-       panic("file_block_walk not implemented");
+	// LAB 5: Your code here.
+	int bn;
+	uint32_t *indirects;
+	if(filebno >= NDIRECT + NINDIRECT) return -E_INVAL;
+	if(filebno < 10){ // 如果小于10 就是可以使用直接块来表达
+		*ppdiskbno = &(f->f_direct[filebno]);
+		return 0;
+	} else { // 否则就必须使用间接块了
+		if (f->f_indirect) {
+			indirects = diskaddr(f->f_indirect);
+			*ppdiskbno = &(indirects[filebno - NDIRECT]);
+		} else {
+			if (!alloc)
+				return -E_NOT_FOUND;
+			if ((bn = alloc_block()) < 0) // 还没有间接块， 分配一个
+				return bn;
+			f->f_indirect = bn;
+			flush_block(diskaddr(bn));  //bn是逻辑块号
+			indirects = diskaddr(bn); //
+			*ppdiskbno = &(indirects[filebno - NDIRECT]);
+		}
+	}
+
+	return 0;
 }
 
 // Set *blk to the address in memory where the filebno'th
@@ -149,8 +186,24 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
 int
 file_get_block(struct File *f, uint32_t filebno, char **blk)
 {
-       // LAB 5: Your code here.
-       panic("file_get_block not implemented");
+    // LAB 5: Your code here.
+	int r;
+	if(filebno >= NDIRECT + NINDIRECT) return -E_INVAL; // 超出范围；
+	uint32_t *pdiskbno;
+
+	if((r = file_block_walk(f, filebno, &pdiskbno, 1)) < 0){
+		return r;
+	}
+	int bn;
+	if (*pdiskbno == 0) {			//此时*pdiskbno保存着文件f第filebno块block的索引
+		if ((bn = alloc_block()) < 0) {
+			return bn;
+		}
+		*pdiskbno = bn;
+		flush_block(diskaddr(bn));
+	}
+	*blk = diskaddr(*pdiskbno); // 这里为什么使用的是char * 的类型，保存的是什么信息，diskadddr返回的就是char* 就是虚拟地址
+	return 0;
 }
 
 // Try to find a file named "name" in dir.  If so, set *file to it.

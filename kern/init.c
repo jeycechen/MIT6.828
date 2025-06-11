@@ -27,12 +27,12 @@ i386_init(void)
 	// Can't call cprintf until after we do this!
 	cons_init();
 
-	cprintf("6828 decimal is %o octal!\n", 6828);
+	cprintf("\n6828 decimal is %o octal!\n", 6828);
 
 	// Lab 2 memory management initialization functions
 	mem_init();
-
 	// Lab 3 user environment initialization functions
+	
 	env_init();
 	trap_init();
 
@@ -49,12 +49,13 @@ i386_init(void)
 
 	// Acquire the big kernel lock before waking up APs
 	// Your code here:
-
+	// 尝试启动其他APs的时候需要加锁， 为什么？？
+	lock_kernel();
 	// Starting non-boot CPUs
 	boot_aps();
 
 	// Start fs.
-	ENV_CREATE(fs_fs, ENV_TYPE_FS);
+	ENV_CREATE(fs_fs, ENV_TYPE_FS); // TODO
 
 #if !defined(TEST_NO_NS)
 	// Start ns.
@@ -66,7 +67,13 @@ i386_init(void)
 	ENV_CREATE(TEST, ENV_TYPE_USER);
 #else
 	// Touch all you want.
-	ENV_CREATE(user_icode, ENV_TYPE_USER);
+	// ENV_CREATE(user_icode, ENV_TYPE_USER);
+	// ENV_CREATE(user_primes, ENV_TYPE_USER);
+	ENV_CREATE(user_testpteshare, ENV_TYPE_USER);
+	// ENV_CREATE(user_primes, ENV_TYPE_USER);
+	// ENV_CREATE(user_forktree, ENV_TYPE_USER);
+
+
 #endif // TEST*
 
 	// Should not be necessary - drains keyboard because interrupt has given up.
@@ -90,12 +97,12 @@ boot_aps(void)
 	struct CpuInfo *c;
 
 	// Write entry code to unused memory at MPENTRY_PADDR
-	code = KADDR(MPENTRY_PADDR);
-	memmove(code, mpentry_start, mpentry_end - mpentry_start);
+	code = KADDR(MPENTRY_PADDR); // 虚拟地址
+	memmove(code, mpentry_start, mpentry_end - mpentry_start); // 复制代码到mp_entry_start
 
 	// Boot each AP one at a time
 	for (c = cpus; c < cpus + ncpu; c++) {
-		if (c == cpus + cpunum())  // We've started already.
+		if (c == cpus + cpunum())  // We've started already. 为什么要这一步，可能是是c的初始化顺序（外层循环）和lapic的实际顺序是有点差别
 			continue;
 
 		// Tell mpentry.S what stack to use 
@@ -103,7 +110,7 @@ boot_aps(void)
 		// Start the CPU at mpentry_start
 		lapic_startap(c->cpu_id, PADDR(code));
 		// Wait for the CPU to finish some basic setup in mp_main()
-		while(c->cpu_status != CPU_STARTED)
+		while(c->cpu_status != CPU_STARTED) // 一直等 等到这个AP初始化完成，才继续下一个
 			;
 	}
 }
@@ -116,19 +123,20 @@ mp_main(void)
 	lcr3(PADDR(kern_pgdir));
 	cprintf("SMP: CPU %d starting\n", cpunum());
 
-	lapic_init();
-	env_init_percpu();
+	lapic_init(); //初始化lapic
+	env_init_percpu(); 
 	trap_init_percpu();
-	xchg(&thiscpu->cpu_status, CPU_STARTED); // tell boot_aps() we're up
+	xchg(&thiscpu->cpu_status, CPU_STARTED); // tell boot_aps() we're up 这是一个原子交换
 
 	// Now that we have finished some basic setup, call sched_yield()
 	// to start running processes on this CPU.  But make sure that
 	// only one CPU can enter the scheduler at a time!
 	//
 	// Your code here:
-
+	lock_kernel();
+	sched_yield();
 	// Remove this after you finish Exercise 6
-	for (;;);
+	// for (;;);
 }
 
 /*

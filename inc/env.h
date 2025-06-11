@@ -28,7 +28,7 @@ typedef int32_t envid_t;
 #define LOG2NENV		10
 #define NENV			(1 << LOG2NENV)
 #define ENVX(envid)		((envid) & (NENV - 1))
-
+// 在jos中 ENV = process 等同于进程的概念
 // Values of env_status in struct Env
 enum {
 	ENV_FREE = 0,

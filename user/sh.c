@@ -42,7 +42,7 @@ again:
 
 		case '<':	// Input redirection
 			// Grab the filename from the argument list
-			if (gettoken(0, &t) != 'w') {
+			if (gettoken(0, &t) != 'w') { // 从参数列表中抓取 文件名
 				cprintf("syntax error: < not followed by word\n");
 				exit();
 			}
@@ -55,7 +55,16 @@ again:
 			// then close the original 'fd'.
 
 			// LAB 5: Your code here.
-			panic("< redirection not implemented");
+			int fd = open(t, O_RDONLY);
+			if(fd < 0){
+				cprintf("open %s for write: %e", t, fd);
+				exit();
+			}
+			if(fd != 0){
+				dup(fd, 0); // 复制fd到文件描述符0。就是将这个fd 覆盖掉了 0；
+				close(fd); // 关闭原始的fd
+			}
+			// panic("< redirection not implemented");
 			break;
 
 		case '>':	// Output redirection

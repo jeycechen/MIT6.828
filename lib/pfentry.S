@@ -31,12 +31,12 @@
 
 .text
 .globl _pgfault_upcall
-_pgfault_upcall:
+_pgfault_upcall: // 这里用的是谁的栈呢 用户栈还是 用户中断栈呢
 	// Call the C page fault handler.
 	pushl %esp			// function argument: pointer to UTF
 	movl _pgfault_handler, %eax
-	call *%eax
-	addl $4, %esp			// pop function argument
+	call *%eax  // 调用完成
+	addl $4, %esp			// pop function argument 
 	
 	// Now the C page fault handler has returned and you must return
 	// to the trap time state.
@@ -65,18 +65,24 @@ _pgfault_upcall:
 	// ways as registers become unavailable as scratch space.
 	//
 	// LAB 4: Your code here.
-
+	addl $0x8, %esp
 	// Restore the trap-time registers.  After you do this, you
 	// can no longer modify any general-purpose registers.
 	// LAB 4: Your code here.
-
+	subl $0x4, 0x28(%esp)
+	movl 0x28(%esp), %edx // 赋值给edx
 	// Restore eflags from the stack.  After you do this, you can
 	// no longer use arithmetic operations or anything else that
 	// modifies eflags.
 	// LAB 4: Your code here.
-
+	movl 0x20(%esp), %eax // 这里是当前 UTF所保存的 eip
+	movl %eax, (%edx) // 把edx寄存器 指向的 内存值 赋值给eax
 	// Switch back to the adjusted trap-time stack.
 	// LAB 4: Your code here.
-
+	popal // pop 所有的通用寄存器 其作用是将栈顶元素依次弹出并分别赋值给eax、ecx、edx、ebx、esp、ebp、esi、edi这 8 个通用寄存器。
+	addl $0x4, %esp
+	popfl // pop eflags 寄存器
+	popl %esp
 	// Return to re-execute the instruction that faulted.
 	// LAB 4: Your code here.
+	ret

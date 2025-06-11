@@ -45,7 +45,6 @@ umain(int argc, char **argv)
 		panic("fork: %e", id);
 	if (id == 0)
 		primeproc();
-
 	// feed all the integers through
 	for (i = 2; ; i++)
 		ipc_send(id, i, 0, 0);

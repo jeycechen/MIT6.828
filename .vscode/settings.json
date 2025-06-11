@@ -1,0 +1,17 @@
+{
+    "files.associations": {
+        "trap.h": "c",
+        "assert.h": "c",
+        "env.h": "c",
+        "pmap.h": "c",
+        "monitor.h": "c",
+        "cpu.h": "c",
+        "x86.h": "c",
+        "types.h": "c",
+        "memlayout.h": "c",
+        "lib.h": "c",
+        "syscall.h": "c",
+        "fs.h": "c",
+        "string.h": "c"
+    }
+}

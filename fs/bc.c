@@ -48,10 +48,18 @@ bc_pgfault(struct UTrapframe *utf)
 	// the disk.
 	//
 	// LAB 5: you code here:
+	addr = (void *) ROUNDDOWN(addr,	PGSIZE);
 
+	if((r = sys_page_alloc(0, addr, PTE_U | PTE_P | PTE_W)) < 0){ // 访问地址 出现了缺页中断，那么分配物理页
+		panic("in bc_pgfault, sys_page_alloc: %e", r);
+	}
+	
+	if((r = ide_read(blockno * BLKSECTS, addr, BLKSECTS)) < 0){ // 读取磁盘数据到这个页
+		panic("in bc_pgfault, ide_read: %e", r);
+	}
 	// Clear the dirty bit for the disk block page since we just read the
 	// block from disk
-	if ((r = sys_page_map(0, addr, 0, addr, uvpt[PGNUM(addr)] & PTE_SYSCALL)) < 0)
+	if ((r = sys_page_map(0, addr, 0, addr, uvpt[PGNUM(addr)] & PTE_SYSCALL)) < 0) 
 		panic("in bc_pgfault, sys_page_map: %e", r);
 
 	// Check that the block we read was allocated. (exercise for
@@ -71,13 +79,21 @@ bc_pgfault(struct UTrapframe *utf)
 void
 flush_block(void *addr)
 {
+	int r;
 	uint32_t blockno = ((uint32_t)addr - DISKMAP) / BLKSIZE;
 
 	if (addr < (void*)DISKMAP || addr >= (void*)(DISKMAP + DISKSIZE))
 		panic("flush_block of bad va %08x", addr);
 
 	// LAB 5: Your code here.
-	panic("flush_block not implemented");
+	addr = ROUNDDOWN(addr, PGSIZE);
+	if (!va_is_mapped(addr) || !va_is_dirty(addr)) return; // 如果这个地址没有被映射 或者 这个地址对应的内容不是dirty的 直接返回
+	// 如果走到了这里 说明就是需要进行 flush
+	if((r = ide_write(blockno * BLKSECTS, addr, BLKSECTS)) < 0) { // 写回磁盘
+		panic("flush_block func, error: %e", r);
+	}
+	if ((r = sys_page_map(0, addr, 0, addr, uvpt[PGNUM(addr)] & PTE_SYSCALL)) < 0) // 刷新脏标记1
+		panic("in bc_pgfault, sys_page_map: %e", r);
 }
 
 // Test that the block cache works, by smashing the superblock and
