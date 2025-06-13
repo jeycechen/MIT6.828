@@ -281,6 +281,7 @@ trap_dispatch(struct Trapframe *tf)
 	}
 	// 时钟中断 
 	if(tf->tf_trapno == IRQ_OFFSET + IRQ_TIMER){
+		time_tick(); // 用作计时
 		lapic_eoi(); // lapic local advanced programmable interrupt contrloller
 		// 硬件设备产生中断的时候 中断控制器会接受信号，然后传递给CPU，CPU响应中断之后，会暂停当前任务，去执行中断处理程序
 		// CPU完成处理之后， 告知lapic处理完毕，以便处理后续的中断。lapic_eoi就是用来通知lapci的 （eoi, end of interrupt）
