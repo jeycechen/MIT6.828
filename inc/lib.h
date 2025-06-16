@@ -60,6 +60,8 @@ int	sys_page_unmap(envid_t env, void *pg);
 int	sys_ipc_try_send(envid_t to_env, uint32_t value, void *pg, int perm);
 int	sys_ipc_recv(void *rcv_pg);
 unsigned int sys_time_msec(void);
+int sys_send_package(char* msg, ssize_t len);
+
 
 // This must be inlined.  Exercise for reader: why?
 // 强制内联 为什么？？

@@ -122,3 +122,8 @@ sys_time_msec(void)
 {
 	return (unsigned int) syscall(SYS_time_msec, 0, 0, 0, 0, 0, 0);
 }
+
+int
+sys_send_package(char* msg, ssize_t len){
+	return (unsigned int) syscall(SYS_send_package, msg, len, 0, 0, 0, 0);
+}

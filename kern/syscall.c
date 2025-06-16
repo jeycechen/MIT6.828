@@ -12,7 +12,7 @@
 #include <kern/console.h>
 #include <kern/sched.h>
 #include <kern/time.h>
-
+#include <kern/e1000.h>
 // Print a string to the system console.
 // The string is exactly 'len' characters long.
 // Destroys the environment on memory errors.
@@ -412,6 +412,13 @@ sys_time_msec(void)
 	return time_msec();
 }
 
+static int
+sys_send_package(char *msg, ssize_t len){
+	// 检查指针
+	// user_mem_assert(curenv, msg, strlen(msg), 0); // 检查传入的指针是否合法，
+	return send_package(msg, len);
+}
+
 // Dispatches to the correct kernel function, passing the arguments.
 int32_t
 syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
@@ -459,6 +466,8 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 			return sys_env_set_trapframe(a1, (struct Trapframe *) a2);
 		case SYS_time_msec:
 			return sys_time_msec();
+		case SYS_send_package:
+			return sys_send_package(a1, a2);
 		case NSYSCALLS:
 			// 无操作
 			ret = 0;

@@ -16,7 +16,7 @@
 #include <kern/spinlock.h>
 #include <kern/time.h>
 #include <kern/pci.h>
-
+#include <kern/e1000.h>
 static void boot_aps(void);
 
 
@@ -54,9 +54,12 @@ i386_init(void)
 	// Starting non-boot CPUs
 	boot_aps();
 
+	
 	// Start fs.
 	ENV_CREATE(fs_fs, ENV_TYPE_FS); // TODO
 
+	// TODO
+	
 #if !defined(TEST_NO_NS)
 	// Start ns.
 	ENV_CREATE(net_ns, ENV_TYPE_NS);
@@ -69,7 +72,7 @@ i386_init(void)
 	// Touch all you want.
 	// ENV_CREATE(user_icode, ENV_TYPE_USER);
 	// ENV_CREATE(user_primes, ENV_TYPE_USER);
-	ENV_CREATE(user_testpteshare, ENV_TYPE_USER);
+	// ENV_CREATE(user_testpteshare, ENV_TYPE_USER);
 	// ENV_CREATE(user_primes, ENV_TYPE_USER);
 	// ENV_CREATE(user_forktree, ENV_TYPE_USER);
 
