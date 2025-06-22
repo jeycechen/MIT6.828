@@ -14,6 +14,8 @@
         "fs.h": "c",
         "string.h": "c",
         "e1000.h": "c",
-        "ns.h": "c"
+        "ns.h": "c",
+        "error.h": "c",
+        "sockets.h": "c"
     }
 }

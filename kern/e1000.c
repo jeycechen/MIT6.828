@@ -1,5 +1,6 @@
 #include <kern/e1000.h>
 #include <kern/pmap.h>
+#include <kern/pmap.h>
 #include <inc/string.h>
 #include <inc/error.h>
 
@@ -9,7 +10,9 @@ struct e1000_tdh* tdh_reg;
 struct e1000_tdt* tdt_reg;
 volatile uint32_t *e1000_reg;
 struct tx_desc tx_desc_list[TXDESCS]; 
-char tx_buffer[TXDESCS][TX_PKT_SIZE]; //不是要连续的物理内存吗？这貌似不连续？
+char tx_buffer[TXDESCS][TX_PKT_SIZE] __attribute__((aligned(4096))); //不是要连续的物理内存吗？这貌似不连续？TODO 无法使用DMA
+
+struct rd_desc rd_desc_list[RDDESCS];
 
 // LAB 6: Your driver code here
 int E1000_attachfn(struct pci_func *pcif){
@@ -34,7 +37,7 @@ void transmit_init(){
     
     // 2. 设置Trasnmit Descriptor Lenght TDLEN 寄存器为描述符列表的长度. 128-b 对齐
     struct e1000_tdlen* tdlen_reg = (struct e1000_tdlen*) E1000REG(E1000_TDLEN / 4);
-    tdlen_reg->len = TXDESCS; 
+    tdlen_reg->len = TXDESCS * sizeof(struct tx_desc); 
 
     // extra. set Transmit Des Base Addr reg (TDBAL/TDBAH) 
     // struct e1000_tdbal* tdbal_reg = (struct e1000_tdbal*) E1000REG(E1000_TDBAL / 4);
@@ -57,7 +60,9 @@ void transmit_init(){
     tdt_reg->tdt = 0;
 
     // 4. 初始化传输控制寄存器TCTL 
-    struct e1000_tctl* tctl_reg = (struct e1000_tctl*) E1000REG(E1000_TCTL / 4);
+    // uint32_t* tctl_reg = (uint32_t *) E1000REG(E1000_TCTL / 4);
+    // *tctl_reg = (E1000_TCTL_EN) | (E1000_TCTL_PSP) | (0x10 << E1000_TCTL_CT) | (0x40 << E1000_TCTL_COLD);
+    volatile struct e1000_tctl* tctl_reg = (struct e1000_tctl*) E1000REG(E1000_TCTL / 4);
     
     // 4.1 设置TCTL.EN 1b
     tctl_reg->en = 1;
@@ -85,6 +90,23 @@ void transmit_init(){
     // init finished.
 }
 
+void receive_init(){
+    // 完成e1000网卡传输过程所需要的初始化过程。 refer to https://pdos.csail.mit.edu/6.828/2017/readings/hardware/8254x_GBe_SDM.pdf 14.4
+    // 1. 接收地址寄存器RAL/ RAH为以合适的太网地址 MAC地址
+
+    // 2. 初始化MTA（Multicast Table Array）为0
+
+    // 3. 配置Interrupt Mask Set/Read (IMS)寄存器 以启用软件驱动程序希望在事件发生时收到通知的任何中断， RXT RXO RXDMT RXSEQ LSC suggested
+
+    // 4. Receive Descriptor Minimum Threshold Interrupt 
+
+    // 5. 分配一部分区域为接收描述符队列， 配置 RDBAL/RDBAH 寄存器
+
+    // 6. 设置Receive Descriptor Length（RDLEN)寄存器为 (in bytes) 描述符队列的长度
+
+    // 7. 
+
+}
 int send_package(char* msg, ssize_t len){ // 发送数据包
     // 将数据复制到传输描述符中。插入到尾部。
     int idx = tdt_reg->tdt;
@@ -95,10 +117,10 @@ int send_package(char* msg, ssize_t len){ // 发送数据包
         return -E_INVAL;
     }
     tx_desc_list[idx].length = len;
-    tx_desc_list[idx].cmd |= (E1000_TXD_CMD_EOP | E1000_TXD_CMD_RS);
+    tx_desc_list[idx].cmd = (E1000_TXD_CMD_EOP | E1000_TXD_CMD_RS);
     tx_desc_list[idx].status &= ~E1000_TXD_STAT_DD;
-
-    memcpy(&tx_desc_list[idx], msg, len); // 复制到缓冲区
+    
+    memcpy(KADDR(tx_desc_list[idx].addr), msg, len); // 复制到缓冲区
     //memcpy(tx_desc_list[idx].addr, msg, len) 这句会报内核错误，为啥，因为这里addr被初始化为了一个物理地址，而memcpy应该使用虚拟地址。
     
     // 内存屏障，确保描述符更新完成

@@ -414,8 +414,8 @@ sys_time_msec(void)
 
 static int
 sys_send_package(char *msg, ssize_t len){
-	// 检查指针
-	// user_mem_assert(curenv, msg, strlen(msg), 0); // 检查传入的指针是否合法，
+	// 检查指针 TODO
+	user_mem_assert(curenv, msg, len, PTE_U); // 检查传入的指针是否合法，
 	return send_package(msg, len);
 }
 

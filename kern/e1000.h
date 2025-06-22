@@ -7,6 +7,7 @@
 #define E1000_VENDOR_ID 0x8086
 #define E1000_DEV_ID    0x100E
 
+// 传输相关的宏
 #define E1000_STATUS    0x00008  /* Device Status - RO */
 #define E1000_TDLEN    0x03808  /* TX Descriptor Length - RW */
 #define E1000_TDH      0x03810  /* TX Descriptor Head - RW */
@@ -17,16 +18,29 @@
 #define E1000_TCTL_CT     0x00000ff0    /* collision threshold */
 #define E1000_TCTL_COLD   0x003ff000    /* collision distance */
 #define E1000_TIPG     0x00410  /* TX Inter-packet gap -RW */
-#define E1000_TXD_STAT_DD    0x00000001 /* Descriptor Done */
+
+/* Transmit Control */
+#define E1000_TCTL_RST    0x00000001    /* software reset */
+#define E1000_TCTL_EN     0x00000002    /* enable tx */
+#define E1000_TCTL_BCE    0x00000004    /* busy check enable */
+#define E1000_TCTL_PSP    0x00000008    /* pad short packets */
+#define E1000_TCTL_CT     0x00000ff0    /* collision threshold */
+#define E1000_TCTL_COLD   0x003ff000    /* collision distance */
+
 #define E1000_TDBAL    0x03800  /* TX Descriptor Base Address Low - RW */
 #define E1000_TDBAH    0x03804  /* TX Descriptor Base Address High - RW */
 #define E1000_TXD_STAT_DD    0x00000001 /* Descriptor Done */
-#define E1000_TXD_CMD_RS     0x08000000 /* Report Status */
-#define E1000_TXD_CMD_EOP    0x01000000 /* End of Packet */
+#define E1000_TXD_CMD_RS     0x08 /* Report Status */
+#define E1000_TXD_CMD_EOP    0x01 /* End of Packet */
 
-#define TX_PKT_SIZE 1518
+#define TX_PKT_SIZE 2048 // 实际上是max是1518 但是为了避免跨页 选用2048 
 #define TXDESCS     32
 
+
+// 接收相关的宏
+#define RDDESCS     128 // lab6文档明确指出至少需要128个描述符 
+
+// 传输相关的结构体
 struct tx_desc //描述符结构体
 {
 	uint64_t addr;
@@ -84,6 +98,15 @@ struct e1000_tipg
 
 extern volatile uint32_t *e1000_reg; // 为什么需要extern
 
+// 接收相关的结构体
+struct rd_desc{
+    uint64_t addr;
+    uint16_t len;
+    uint16_t checksum;
+    uint8_t status;
+    uint8_t err;
+    uint16_t special;
+}__attribute__((packed));
 enum {
     E_TRANSMIT_RETRY = 1,
     E_RECEIVE_RETRY
